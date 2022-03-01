@@ -129,7 +129,9 @@ def run(args=None):
 
         combo_name = "fdm_output.txt"
         cmd = "{} < fdm_input.txt > {}".format(args.fdm, combo_name)
-        os.system(cmd)
+        status = os.system(cmd)
+        if status == 2:
+            raise KeyboardInterrupt
 
         MV = None
         MP = None
