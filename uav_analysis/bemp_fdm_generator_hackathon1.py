@@ -18,7 +18,7 @@ import math
 import os
 import sys
 
-from uav_analysis.bemp_combinations import battery_motor_propeller_generator
+from uav_analysis.bemp_combinations_hackathon1 import battery_motor_propeller_generator
 
 
 def generate_input(bemp_comb, propdata):
@@ -67,7 +67,7 @@ def run(args=None):
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--propdata',
                         default=os.path.relpath(os.path.join(
-                            os.path.dirname(__file__), 'data', 'propeller')),
+                            os.path.dirname(__file__), 'data_hackathon1', 'propeller')),
                         type=str,
                         metavar='DIR',
                         help="path to propeller data directory")

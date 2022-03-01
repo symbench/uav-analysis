@@ -17,14 +17,14 @@
 import argparse
 import sys
 
-from uav_analysis import testbench_data, mass_properties, bemp_combinations, bemp_fdm_generator
+from uav_analysis import bemp_combinations_hackathon1, bemp_fdm_generator_hackathon1, testbench_data, mass_properties
 
 
 def run():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('command', help="""
-    testbench-data, mass-properties, bemp-combinations, bemp-fdm-generator
+    testbench-data, mass-properties, bemp-combinations-hackathon1, bemp-fdm-generator-hackathon1
     """)
     args = parser.parse_args(sys.argv[1:2])
 
@@ -36,10 +36,10 @@ def run():
         testbench_data.run(args=sys.argv[2:])
     elif args.command == 'mass-properties':
         mass_properties.run(args=sys.argv[2:])
-    elif args.command == 'bemp-combinations':
-        bemp_combinations.run(args=sys.argv[2:])
-    elif args.command == 'bemp-fdm-generator':
-        bemp_fdm_generator.run(args=sys.argv[2:])
+    elif args.command == 'bemp-combinations-hackathon1':
+        bemp_combinations_hackathon1.run(args=sys.argv[2:])
+    elif args.command == 'bemp-fdm-generator-hackathon1':
+        bemp_fdm_generator_hackathon1.run(args=sys.argv[2:])
     else:
         parser.print_help()
 

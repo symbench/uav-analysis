@@ -23,7 +23,7 @@ import os
 import re
 import zipfile
 
-from uav_analysis.bemp_combinations import BATTERIES, PROPELLERS, MOTORS
+from uav_analysis.bemp_combinations_hackathon1 import BATTERIES, PROPELLERS, MOTORS
 
 
 def parse_fortran_value(value: str) -> Any:
