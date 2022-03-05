@@ -17,14 +17,15 @@
 import argparse
 import sys
 
-from uav_analysis import bemp_combinations_hackathon1, bemp_fdm_generator_hackathon1, testbench_data, mass_properties
+from click import command
 
+from uav_analysis import bemp_combinations_hackathon1, bemp_combinations_hackathon2_uam, bemp_fdm_generator_hackathon1, bemp_fdm_generator_hackathon2_uam, testbench_data, mass_properties
 
 def run():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('command', help="""
-    testbench-data, mass-properties, bemp-combinations-hackathon1, bemp-fdm-generator-hackathon1
+    testbench-data, mass-properties, bemp-combinations-hackathon1, bemp-fdm-generator-hackathon1, bemp-combinations-hackathon2, bemp-fdm-generator-hackathon2
     """)
     args = parser.parse_args(sys.argv[1:2])
 
@@ -40,6 +41,10 @@ def run():
         bemp_combinations_hackathon1.run(args=sys.argv[2:])
     elif args.command == 'bemp-fdm-generator-hackathon1':
         bemp_fdm_generator_hackathon1.run(args=sys.argv[2:])
+    elif args.command == 'bemp-combinations-hackathon2':
+        bemp_combinations_hackathon2_uam.run(args=sys.argv[2:])
+    elif args.command == 'bemp-fdm-generator-hackathon2':
+        bemp_fdm_generator_hackathon2_uam.run(args=sys.argv[2:])
     else:
         parser.print_help()
 
