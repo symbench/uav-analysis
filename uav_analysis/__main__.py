@@ -20,7 +20,7 @@ import sys
 from click import command
 
 from uav_analysis import bemp_combinations_hackathon1, bemp_fdm_generator_hackathon1, mass_properties_hackathon1, testbench_data
-from uav_analysis import bemp_combinations_hackathon2_uam, bemp_fdm_generator_hackathon2_uam
+from uav_analysis import bemp_combinations_hackathon2_uam, bemp_fdm_generator_hackathon2_uam, battery_analysis
 
 
 def run():
@@ -48,6 +48,8 @@ def run():
         bemp_combinations_hackathon2_uam.run(args=sys.argv[2:])
     elif args.command == 'bemp-fdm-generator-hackathon2':
         bemp_fdm_generator_hackathon2_uam.run(args=sys.argv[2:])
+    elif args.command == 'battery-analysis':
+        battery_analysis.run(args=sys.argv[2:])
     else:
         parser.print_help()
 
