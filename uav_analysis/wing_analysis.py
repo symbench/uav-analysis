@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Generator, Iterable
 
 import csv
 import math
@@ -113,7 +113,7 @@ def run_new_fdm(fdm_binary: str, fdm_input: str) -> str:
 
 def parse_fdm_output(fdm_output: str, target_speed: float = 50.0) -> List[Dict[str, float]]:
     angles = dict()
-    speeds = None
+    speeds = []
 
     state = ""
     for line in fdm_output.splitlines():
@@ -129,7 +129,14 @@ def parse_fdm_output(fdm_output: str, target_speed: float = 50.0) -> List[Dict[s
         if line.startswith("  Flight speed (m/s)"):
             speeds = [float(line[pos:pos+9]) for pos in range(20, 110, 9)]
         elif line.startswith("          ") and len(line) >= 110 and state:
-            row = [float(line[pos:pos+9]) for pos in range(11, 110, 9)]
+            row = []
+            for pos in range(11, 110, 9):
+                try:
+                    value = float(line[pos:pos+9])
+                except ValueError:
+                    value = math.nan
+                row.append(value)
+
 
             if state == "lift":
                 assert row[0] not in angles
@@ -184,36 +191,78 @@ def calc_geom_data(profile: str, chord1: float, chord2: float,
     }
 
 
+def calc_weight_data(profile: str, chord1: float, chord2: float,
+                   span: float, max_load: float) -> Dict[str, float]:
+    """ Extracted from Creo models (Tools/Relations) """
+
+    match = NACA_PROFILE.match(profile)
+    assert match
+    thickness = float(match.group(3))
+
+
+    taper_offset = 0 # assuming no taper offset
+
+    N = 1.5  # safety factor
+    VE = 50  # max airspeed
+    s = (chord1 + chord2) / 2 * span  # plan form area with taper accounted for
+    ar = span ** 2 / s  # aspect ratio assuming non-constant chord wing
+    sa = math.atan(abs(chord1 - chord2) * taper_offset / span)  # weep angle
+    mc = (chord1 + chord2) / 2  # mean chord
+    tr = chord2 / chord1  # taper ratio
+    weight = (
+        0.4536
+        * 96.948
+        * (
+            (max_load * 0.225 * N / (10 ** 5)) ** 0.65
+            * (ar / math.cos(sa)) ** 0.57
+            * (s / (100 * 92903)) ** 0.61
+            * ((1 + (1 / tr)) / (2 * thickness / 100)) ** 0.36
+            * (1 + (VE * 1.944 / 500)) ** 0.5
+        )
+        ** 0.993
+    )
+
+    return {
+        "weight": weight,
+    }
+
+
 def combination_generator(
-    profiles: List[str],
-    chords: List[float],
-    spans: List[float]
-) -> List[Dict[str, Any]]:
+    profiles: Iterable[str],
+    chords: Iterable[float],
+    spans: Iterable[float],
+    max_loads: Iterable[float],
+) -> Generator[Dict[str, Any], None, None]:
     for profile in profiles:
         for chord in chords:
             for span in spans:
-                yield {
-                    "profile": profile,
-                    "chord": chord,
-                    "span": span,
-                }
+                for max_load in max_loads:
+                    yield {
+                        "profile": profile,
+                        "chord": chord,
+                        "span": span,
+                        "max_load": max_load,
+                    }
 
 
 def datapoint_generator(
         fdm_binary: str,
         target_speed: float,
-        combinations: List[Dict[str, Any]]
-) -> Dict[str, Any]:
+        combinations: Iterable[Dict[str, Any]]
+) -> Generator[Dict[str, Any], None, None]:
     for comb in combinations:
         wing_data = calc_wing_data(
             comb["profile"], comb["chord"], comb["chord"], comb["span"])
         geom_data = calc_geom_data(
             comb["profile"], comb["chord"], comb["chord"], comb["span"])
+        weight_data = calc_weight_data(
+            comb["profile"], comb["chord"], comb["chord"], comb["span"],
+            comb["max_load"])
         fdm_input = generate_fdm_input(wing_data)
         fdm_output = run_new_fdm(fdm_binary, fdm_input)
         lift_drags = parse_fdm_output(fdm_output, target_speed)
         for lift_drag in lift_drags:
-            yield {**comb, **lift_drag, **geom_data}
+            yield {**comb, **lift_drag, **geom_data, **weight_data}
 
 
 def run(args=None):
@@ -235,6 +284,8 @@ def run(args=None):
                         help='limits the search to this chord number')
     parser.add_argument('--span', type=float,
                         help='limits the search to this span number')
+    parser.add_argument('--max-load', type=float,
+                        help='limits the search to this max load number')
     parser.add_argument('--info', action='store_true',
                         help="print out all search ranges")
     args = parser.parse_args(args)
@@ -255,20 +306,26 @@ def run(args=None):
     else:
         spans = range(500, 5500, 500)
 
+    if args.max_load is not None:
+        max_loads = [args.max_load]
+    else:
+        max_loads = range(3000, 20000, 100)
+
     if args.info:
         print("profiles:", ", ".join(profiles))
         print("chords:", ", ".join(map(str, chords)))
         print("spans:", ", ".join(map(str, spans)))
+        print("max_loads:", ", ".join(map(str, max_loads)))
         print("target speed:", str(args.speed) + ", number of angles: 21")
         print("TOTAL:", len(profiles) * len(chords) * len(spans) * 21,
               "data points")
         return
 
-    combinations = combination_generator(profiles, chords, spans)
+    combinations = combination_generator(profiles, chords, spans, max_loads)
     datapoints = datapoint_generator(args.fdm, args.speed, combinations)
 
     with open(args.output, 'w', newline='') as file:
-        row = datapoints.__next__()
+        row = next(datapoints)
         writer = csv.DictWriter(file, row.keys())
         writer.writeheader()
         writer.writerow(row)
