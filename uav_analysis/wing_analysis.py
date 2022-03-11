@@ -16,6 +16,7 @@
 
 from typing import Any, List, Dict, Generator, Iterable
 
+import sys
 import csv
 import math
 import os
@@ -300,26 +301,26 @@ def run(args=None):
     if args.chord is not None:
         chords = [args.chord]
     else:
-        chords = range(100, 1100, 100)
+        chords = range(500, 5500, 500)
 
     if args.span is not None:
         spans = [args.span]
     else:
-        spans = range(500, 5500, 500)
+        spans = range(1000, 11000, 1000)
 
     if args.max_load is not None:
         max_loads = [args.max_load]
     else:
-        max_loads = range(3000, 20000, 100)
+        max_loads = range(1000, 11000, 1000)
 
+    total = len(profiles) * len(chords) * len(spans) * len(max_loads) * 21
     if args.info:
         print("profiles:", ", ".join(profiles))
         print("chords:", ", ".join(map(str, chords)))
         print("spans:", ", ".join(map(str, spans)))
         print("max_loads:", ", ".join(map(str, max_loads)))
         print("target speed:", str(args.speed) + ", number of angles: 21")
-        print("TOTAL:", len(profiles) * len(chords) * len(spans) * 21,
-              "data points")
+        print("TOTAL:", total, "data points")
         return
 
     combinations = combination_generator(profiles, chords, spans, max_loads)
@@ -330,9 +331,14 @@ def run(args=None):
         writer = csv.DictWriter(file, row.keys())
         writer.writeheader()
         writer.writerow(row)
+        cnt = 0
         for row in datapoints:
             writer.writerow(row)
-
+            if cnt % 1000 == 0:
+                sys.stdout.write('\r')
+                sys.stdout.write("{:10.2f}%".format(100 * cnt / total))
+                sys.stdout.flush()
+            cnt += 1
 
 if __name__ == '__main__':
     run()
