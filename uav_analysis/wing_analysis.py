@@ -43,7 +43,7 @@ def calc_wing_data(profile: str, chord1: float, chord2: float,
     dcl_daoa_slope = float(wing_dict["dCl/dAoA Slope [1/deg.]"])
     aoa_l0 = float(wing_dict["AoA @ L0 [deg.]"])
     cl_max = float(wing_dict["CL Max"])
-    cd_min = float(wing_dict["CD0 Min"])
+    cd_min = float(wing_dict["CD Min"])
 
     return {
         "surface_area": surface_area,
@@ -223,6 +223,7 @@ def calc_weight_data(profile: str, chord1: float, chord2: float,
     )
 
     return {
+        "max_load": max_load,
         "weight": weight,
     }
 
