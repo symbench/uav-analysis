@@ -25,7 +25,7 @@ import re
 from .bemp_combinations_hackathon2_uam import WINGS
 
 
-NACA_PROFILE = re.compile("^NACA (\d)(\d)(\d\d)$")
+NACA_PROFILE = re.compile(r"^NACA (\d)(\d)(\d\d)$")
 
 
 def calc_wing_data(profile: str, chord1: float, chord2: float,
@@ -37,7 +37,8 @@ def calc_wing_data(profile: str, chord1: float, chord2: float,
     SA = MC * span  # Surface area = planform area
     TR = min([chord1, chord2]) / max([chord1, chord2])  # Taper ratio
     AR = span ** 2 / SA  # aspect ratio, modified defintion for tapered wings
-    Hfun = 0.0524 * TR ** 4 - 0.15 * TR ** 3 + 0.1659 * TR ** 2 - 0.0706 * TR + 0.0119
+    Hfun = 0.0524 * TR ** 4 - 0.15 * TR ** 3 + \
+        0.1659 * TR ** 2 - 0.0706 * TR + 0.0119
     k = (1 + Hfun * AR) / (math.pi * AR)
 
     surface_area = (chord1 + chord2) / 2 * span
@@ -138,7 +139,6 @@ def parse_fdm_output(fdm_output: str, target_speed: float = 50.0) -> List[Dict[s
                     value = math.nan
                 row.append(value)
 
-
             if state == "lift":
                 assert row[0] not in angles
                 angles[row[0]] = [row[1:], None]
@@ -152,6 +152,10 @@ def parse_fdm_output(fdm_output: str, target_speed: float = 50.0) -> List[Dict[s
         assert len(lifts) == len(speeds) and len(drags) == len(speeds)
         for speed, lift, drag in zip(speeds, lifts, drags):
             if speed != target_speed:
+                continue
+
+            # filter out bad datapoints
+            if not math.isfinite(lift) or not math.isfinite(drag):
                 continue
 
             # we have two identical wings, search for "call CLDwing" in new_fdm.f
@@ -193,15 +197,14 @@ def calc_geom_data(profile: str, chord1: float, chord2: float,
 
 
 def calc_weight_data(profile: str, chord1: float, chord2: float,
-                   span: float, max_load: float) -> Dict[str, float]:
+                     span: float, max_load: float) -> Dict[str, float]:
     """ Extracted from Creo models (Tools/Relations) """
 
     match = NACA_PROFILE.match(profile)
     assert match
     thickness = float(match.group(3))
 
-
-    taper_offset = 0 # assuming no taper offset
+    taper_offset = 0  # assuming no taper offset
 
     N = 1.5  # safety factor
     VE = 50  # max airspeed
@@ -264,7 +267,8 @@ def datapoint_generator(
         fdm_output = run_new_fdm(fdm_binary, fdm_input)
         lift_drags = parse_fdm_output(fdm_output, target_speed)
         for lift_drag in lift_drags:
-            yield {**comb, **lift_drag, **geom_data, **weight_data}
+            if lift_drag["flight_load"] < comb["max_load"]:
+                yield {**comb, **lift_drag, **geom_data, **weight_data}
 
 
 def run(args=None):
@@ -339,6 +343,7 @@ def run(args=None):
                 sys.stdout.write("{:10.2f}%".format(100 * cnt / total))
                 sys.stdout.flush()
             cnt += 1
+
 
 if __name__ == '__main__':
     run()
