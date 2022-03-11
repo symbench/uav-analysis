@@ -148,11 +148,17 @@ def parse_fdm_output(fdm_output: str, target_speed: float = 50.0) -> List[Dict[s
             if speed != target_speed:
                 continue
 
+            # we have two identical wings, search for "call CLDwing" in new_fdm.f
+            wing_load = 0.5 * math.sqrt(lift ** 2 + drag ** 2)
+
             result.append({
                 "angle": angle,
                 "speed": speed,
-                "lift": lift,
-                "drag": drag,
+                "lift2x": lift,
+                "drag2x": drag,
+                "lift": 0.5 * lift,
+                "drag": 0.5 * drag,
+                "wing_load": wing_load,
             })
 
     return result
