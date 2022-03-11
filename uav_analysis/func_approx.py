@@ -45,16 +45,16 @@ def evaluate(expr: sympy.Expr, input_data: Dict[str, numpy.ndarray]) -> numpy.nd
     All numpy array must be of the same size or at least broadcastable.
     """
     if (isinstance(expr, float) or isinstance(expr, int)
-            or expr.func == sympy.Float
-            or expr.func == sympy.Integer
-            or expr.func == sympy.numbers.Rational
-            or expr.func == sympy.numbers.NegativeOne
-            or expr.func == sympy.numbers.Zero
-            or expr.func == sympy.numbers.One
-            or expr.func == sympy.numbers.Pi
-            or expr.func == sympy.numbers.Half):
+            or expr.func == sympy.core.numbers.Float
+            or expr.func == sympy.core.numbers.Integer
+            or expr.func == sympy.core.numbers.Rational
+            or expr.func == sympy.core.numbers.NegativeOne
+            or expr.func == sympy.core.numbers.Zero
+            or expr.func == sympy.core.numbers.One
+            or expr.func == sympy.core.numbers.Pi
+            or expr.func == sympy.core.numbers.Half):
         return numpy.full((), float(expr))
-    elif isinstance(expr, sympy.numbers.NaN):
+    elif isinstance(expr, sympy.core.numbers.NaN):
         raise ValueError("NaN value encountered, maybe from dividing by zero")
     elif expr.func == sympy.Symbol:
         return input_data[expr.name]
@@ -81,7 +81,7 @@ def evaluate(expr: sympy.Expr, input_data: Dict[str, numpy.ndarray]) -> numpy.nd
 def approximate(func: sympy.Expr, input_data: Dict[str, numpy.ndarray],
                 output_data: numpy.ndarray) -> Dict[str, float]:
     """
-    Takes a expression with input and parameter variables, an input 
+    Takes a expression with input and parameter variables, an input
     data set of shape [num_points, input_vars] and an output data
     of shape [num_points]. Returns the mapping of parameter values
     to floats that minimizes the square error of the calculated and
