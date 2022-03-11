@@ -149,7 +149,7 @@ def parse_fdm_output(fdm_output: str, target_speed: float = 50.0) -> List[Dict[s
                 continue
 
             # we have two identical wings, search for "call CLDwing" in new_fdm.f
-            wing_load = 0.5 * math.sqrt(lift ** 2 + drag ** 2)
+            flight_load = 0.5 * math.sqrt(lift ** 2 + drag ** 2)
 
             result.append({
                 "angle": angle,
@@ -158,7 +158,7 @@ def parse_fdm_output(fdm_output: str, target_speed: float = 50.0) -> List[Dict[s
                 "drag2x": drag,
                 "lift": 0.5 * lift,
                 "drag": 0.5 * drag,
-                "wing_load": wing_load,
+                "flight_load": flight_load,
             })
 
     return result
@@ -213,6 +213,8 @@ def run(args=None):
                         help='limits the search to this chord number')
     parser.add_argument('--span', type=float,
                         help='limits the search to this span number')
+    parser.add_argument('--info', action='store_true',
+                        help="print out all search ranges")
     args = parser.parse_args(args)
 
     if args.naca is not None:
@@ -224,12 +226,21 @@ def run(args=None):
     if args.chord is not None:
         chords = [args.chord]
     else:
-        chords = range(100, 210, 50)
+        chords = range(100, 1100, 100)
 
     if args.span is not None:
         spans = [args.span]
     else:
-        spans = range(100, 210, 50)
+        spans = range(500, 5500, 500)
+
+    if args.info:
+        print("profiles:", ", ".join(profiles))
+        print("chords:", ", ".join(map(str, chords)))
+        print("spans:", ", ".join(map(str, spans)))
+        print("target speed:", str(args.speed) + ", number of angles: 21")
+        print("TOTAL:", len(profiles) * len(chords) * len(spans) * 21,
+              "data points")
+        return
 
     combinations = combination_generator(profiles, chords, spans)
     datapoints = datapoint_generator(args.fdm, args.speed, combinations)
