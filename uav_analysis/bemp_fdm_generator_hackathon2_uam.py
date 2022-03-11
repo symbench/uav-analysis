@@ -22,7 +22,7 @@ import sys
 from uav_analysis.bemp_combinations_hackathon2_uam import battery_motor_propeller_generator
 
 
-def generate_input(bemp_comb, propdata):
+def generate_input(bemp_comb, propdata, fixedBatteryParams=False):
     str_return = "&aircraft_data\n"
     str_return += "   aircraft%cname           = 'UAV'\n"
     str_return += "   aircraft%ctype           = 'SymCPS UAV Design'\n"
@@ -52,11 +52,35 @@ def generate_input(bemp_comb, propdata):
     str_return += "\n"
     str_return += "!   Battery(1) is component named: Battery_0\n"
     str_return += "   battery(1)%num_cells = {}\n".format(int(bemp_comb["Battery.Number of Series Cells"][0]))
-    str_return += "   battery(1)%voltage = {}\n".format(bemp_comb["Battery.Min Voltage [V]"])
-    str_return += "   battery(1)%capacity = {}\n".format(bemp_comb["Battery.Capacity [Ah]"])
-    str_return += "   battery(1)%C_Continuous = {}\n".format(bemp_comb["Battery.Cont. Discharge Rate [C]"])
-    str_return += "   battery(1)%C_Peak = {}\n".format(bemp_comb["Battery.Peak Discharge Rate [C]"])
+    
+
+    if fixedBatteryParams:
+        bemp_comb["Battery.Min Voltage [V]"] = "1000"  # hardcode 1000 V -- doesn't work
+        bemp_comb["Battery.Capacity [Ah]"] = "100" # harcode 100 Ah
+        bemp_comb["Battery.Cont. Discharge Rate [C]"] = "25"  # hardcode 25 A
+        bemp_comb["Battery.Peak Discharge Rate [C]"] = "50"  # hardcode 50 A
+
+    str_return += "   battery(1)%voltage = {}\n".format(
+        bemp_comb["Battery.Max Voltage [V]"])
+
+    str_return += "   battery(1)%capacity = {}\n".format(
+        bemp_comb["Battery.Capacity [Ah]"])
+
+    
+    str_return += "   battery(1)%C_Continuous = {}\n".format(
+        bemp_comb["Battery.Cont. Discharge Rate [C]"])
+
+    
+    str_return += "   battery(1)%C_Peak = {}\n".format(
+        bemp_comb["Battery.Peak Discharge Rate [C]"])
     str_return += "/\n"
+
+    print(f"--- BATTERY PARAMS (fixbatt={fixedBatteryParams}): ---")
+    print(f"VOLTAGE: {bemp_comb['Battery.Min Voltage [V]']}")
+    print(f"CAPACITY: {bemp_comb['Battery.Capacity [Ah]']}")
+    print(f"CONT_DIS: {bemp_comb['Battery.Cont. Discharge Rate [C]']}")
+    print(f"PEAK_DIS: {bemp_comb['Battery.Peak Discharge Rate [C]']}")
+
 
     return str_return
 
@@ -83,7 +107,7 @@ def run(args=None):
                         metavar='NUM',
                         help="process only LIMIT number of combinations")
     parser.add_argument('--fdm',
-                        default='./new_fdm_step0',
+                        default='../flight-dynamics-model/bin/new_fdm',
                         type=str,
                         metavar='PATH',
                         help="path to fdm executable")
@@ -96,6 +120,12 @@ def run(args=None):
     parser.add_argument('--battery',
                         metavar='NAME',
                         help='limits the search space to this battery')
+    parser.add_argument('--fixbatt',
+                        action='store_true',
+                        help='true or false to fix battery voltage, capacity, and discharge rates')
+    parser.add_argument('--feature', action='store_true')
+    #parser.set_defaults(fixbatt=False)
+    
     args = parser.parse_args(args)
 
     generator = battery_motor_propeller_generator(reversible=False)
@@ -105,6 +135,15 @@ def run(args=None):
                     "MC_omega_rad,MC_omega_RPM,MC_Voltage,MC_Thrust,MC_Torque,MC_Power,MC_Current,MC_Efficiency," \
                     "MaxPower,MaxCur,PeakCur,ContCur," \
                     "Aircraft_Weight,Aircraft_Thrust,Aircraft_Thrust2Weight,Aircraft_FlightTime\n"
+    
+    # modified to consider mainly motor and propeller
+    # output_header = "Battery,Motor,Propeller,Battery_Weight,Battery_Capacity,Motor_Weight,Propeller_Weight," \
+    #                 "MV_omega_rad,MV_omega_RPM,MV_Voltage,MV_Thrust,MV_Torque,MV_Power,MV_Current,MV_Efficiency," \
+    #                 "MP_omega_rad,MP_omega_RPM,MP_Voltage,MP_Thrust,MP_Torque,MP_Power,MP_Current,MP_Efficiency," \
+    #                 "MC_omega_rad,MC_omega_RPM,MC_Voltage,MC_Thrust,MC_Torque,MC_Power,MC_Current,MC_Efficiency," \
+    #                 "MaxPower,MaxCur,PeakCur,ContCur," \
+    #                 "Aircraft_Weight,Aircraft_Thrust,Aircraft_Thrust2Weight,Aircraft_FlightTime\n"
+    
     res_fname = args.output
     res_file = open(res_fname, 'w')
     res_file.write(output_header)
@@ -122,11 +161,16 @@ def run(args=None):
         if args.battery and args.battery != combination["Battery.Name"]:
             continue
 
-        combination['Aircraft.Mass'] = 0.347232355870562 + float(combination['Battery.Weight [kg]']) + \
-            4 * (float(combination['Motor.Weight [grams]'])/ 1000) + 4 * (float(combination['Propeller.Weight_g']) / 1000)
+        # combination['Aircraft.Mass'] = 0.347232355870562 + float(combination['Battery.Weight [kg]']) + \
+        #     4 * (float(combination['Motor.Weight [grams]'])/ 1000) + 4 * (float(combination['Propeller.Weight_g']) / 1000)
 
+        # just consider the weight of the motor and propeller, kg 
+        combination['Aircraft.Mass'] = (
+            float(combination['Motor.Weight [grams]']) / 1000) + (
+                float(combination['Propeller.Weight_g']) / 1000) 
+                
         with open('fdm_input.txt', 'w') as file_object:
-            file_object.write(generate_input(combination, args.propdata))
+            file_object.write(generate_input(combination, args.propdata, args.fixbatt))
 
         combo_name = "fdm_output.txt"
         cmd = "{} < fdm_input.txt > {}".format(args.fdm, combo_name)
@@ -137,15 +181,28 @@ def run(args=None):
         MV = None
         MP = None
         MC = None
+        count = 0
         with open(combo_name, 'r') as file_object:
             for line in file_object.readlines():
                 line = line.strip()
+
+                if line.startswith("Motor #"):
+                    print(f"\t{line}")
+                if line.startswith("(rad/s)"):
+                    print(f"\t\t  {line}")
                 if line.startswith("Max Volt  1"):
                     MV = line.split()
+                    print(f"MV {line}")
                 elif line.startswith("Max Power 1"):
                     MP = line.split()
+                    print(f"MP {line}")
                 elif line.startswith("Max Amps  1"):
                     MC = line.split()
+                    print(f"MC {line}")
+            # instrument code to view output
+            count += 1
+            if count == 1:
+                break
 
         try:
             for i in range(3, 11):
