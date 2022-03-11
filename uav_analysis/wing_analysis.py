@@ -305,7 +305,7 @@ def run(args=None):
     if args.chord is not None:
         chords = [args.chord]
     else:
-        chords = range(500, 5500, 500)
+        chords = range(3000, 4100, 100)
 
     if args.span is not None:
         spans = [args.span]
@@ -315,7 +315,7 @@ def run(args=None):
     if args.max_load is not None:
         max_loads = [args.max_load]
     else:
-        max_loads = range(1000, 11000, 1000)
+        max_loads = range(5000, 10500, 500)
 
     total = len(profiles) * len(chords) * len(spans) * len(max_loads) * 21
     if args.info:
@@ -343,6 +343,7 @@ def run(args=None):
                 sys.stdout.write("{:10.2f}%".format(100 * cnt / total))
                 sys.stdout.flush()
             cnt += 1
+        print("\nDone")
 
 
 if __name__ == '__main__':
