@@ -24,14 +24,12 @@ import re
 from .bemp_combinations_hackathon2_uam import WINGS
 
 
-NACA_PROFILE = re.compile("^NACA (\d\d\d\d)$")
+NACA_PROFILE = re.compile("^NACA (\d)(\d)(\d\d)$")
 
 
 def calc_wing_data(profile: str, chord1: float, chord2: float,
                    span: float) -> Dict[str, float]:
     """ Copied from run_fd_calc.py """
-
-    assert NACA_PROFILE.match(profile)
     wing_dict = WINGS[profile]
 
     MC = (chord1 + chord2) / 2  # Mean chord
@@ -164,6 +162,28 @@ def parse_fdm_output(fdm_output: str, target_speed: float = 50.0) -> List[Dict[s
     return result
 
 
+def calc_geom_data(profile: str, chord1: float, chord2: float,
+                   span: float) -> Dict[str, float]:
+    """ Copied from run_fd_calc.py for battery packing """
+
+    match = NACA_PROFILE.match(profile)
+    assert match
+    thickness = float(match.group(3))
+
+    root_chord = max([chord1, chord2])
+    tip_chord = min([chord1, chord2])
+    A = root_chord/2
+    B = thickness/100*A
+    C = tip_chord/2
+    D = thickness/100*C
+
+    available_volume = 1/6*span*(A*B+C*D+((A+C)*(B+D)))
+
+    return {
+        "available_volume": available_volume,
+    }
+
+
 def combination_generator(
     profiles: List[str],
     chords: List[float],
@@ -187,11 +207,13 @@ def datapoint_generator(
     for comb in combinations:
         wing_data = calc_wing_data(
             comb["profile"], comb["chord"], comb["chord"], comb["span"])
+        geom_data = calc_geom_data(
+            comb["profile"], comb["chord"], comb["chord"], comb["span"])
         fdm_input = generate_fdm_input(wing_data)
         fdm_output = run_new_fdm(fdm_binary, fdm_input)
         lift_drags = parse_fdm_output(fdm_output, target_speed)
         for lift_drag in lift_drags:
-            yield {**comb, **lift_drag}
+            yield {**comb, **lift_drag, **geom_data}
 
 
 def run(args=None):
