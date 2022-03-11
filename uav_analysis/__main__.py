@@ -19,17 +19,24 @@ import sys
 
 from click import command
 
-from uav_analysis import bemp_combinations_hackathon1, bemp_fdm_generator_hackathon1, mass_properties_hackathon1, testbench_data
-from uav_analysis import bemp_combinations_hackathon2_uam, bemp_fdm_generator_hackathon2_uam, battery_analysis
+from . import bemp_combinations_hackathon1
+from . import bemp_fdm_generator_hackathon1
+from . import mass_properties_hackathon1
+from . import testbench_data
+from . import bemp_combinations_hackathon2_uam
+from . import bemp_fdm_generator_hackathon2_uam
+from . import battery_analysis
+from . import wing_analysis
 
 
 def run():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('command', help="""
-    testbench-data, mass-properties-hackathon1, bemp-combinations-hackathon1, bemp-fdm-generator-hackathon1, 
-    bemp-combinations-hackathon2, bemp-fdm-generator-hackathon2
-    """)
+    parser.add_argument('command', metavar="COMMAND", help=", ".join(sorted([
+        "testbench-data", "mass-properties-hackathon1",
+        "bemp-combinations-hackathon1", "bemp-fdm-generator-hackathon1",
+        "bemp-combinations-hackathon2", "bemp-fdm-generator-hackathon2",
+        "battery-analysis", "wing-analysis"])))
     args = parser.parse_args(sys.argv[1:2])
 
     # hack the program name for nested parsers
@@ -50,6 +57,8 @@ def run():
         bemp_fdm_generator_hackathon2_uam.run(args=sys.argv[2:])
     elif args.command == 'battery-analysis':
         battery_analysis.run(args=sys.argv[2:])
+    elif args.command == 'wing-analysis':
+        wing_analysis.run(args=sys.argv[2:])
     else:
         parser.print_help()
 
