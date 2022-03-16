@@ -1,89 +1,77 @@
 import math
 import sys
-from typing import List
+from typing import List, Iterable, Generator
 
 import sympy
 from uav_analysis.bemp_combinations_hackathon2_uam import BATTERIES
-from uav_analysis.bemp_combinations_hackathon2_uam import WINGS
+
+
+def combination_generator(
+        batteries: Iterable[str],
+        max_series: int,
+        max_parallel: int
+):
+    for b in batteries:
+        for s in range(1, max_series + 1):
+            for p in range(1, max_parallel + 1):
+                yield {
+                    "battery": b,
+                    "series_count": s,
+                    "parallel_count": p,
+                }
+
+
+def calc_volume(battery_volume: float,
+                series_count: int,
+                parallel_count: int) -> float:
+    return parallel_count * (series_count * battery_volume)
+
+
+def calc_weight(battery_weight: float,
+                series_count: int,
+                parallel_count: int) -> float:
+    return parallel_count * (series_count * battery_weight)
+
+
+def calc_power(battery_cap: float,
+               battery_voltage: float,
+               series_count: int,
+               parallel_count: int) -> float:
+    return parallel_count * battery_cap * series_count * battery_voltage
 
 
 def generate_csv(fname, constant_capacity):
     try:
-        output_file = open(fname, 'a')
+        output_file = open(fname, 'w')
     except OSError:
         print("Could not open file:", fname)
         sys.exit()
     output_file.write("NAME,SERIES_COUNT,PAR_COUNT,VOLUME,WEIGHT,POWER\n")
-    for b in BATTERIES:
-        print("Processing battery: ", b)
-        generate_rows(output_file, b, constant_capacity)
+
+    comb_generator = combination_generator(BATTERIES, 10, 10)
+    for c in comb_generator:
+        print("Processing combination: ", c)
+        battery_volume = float(BATTERIES[c["battery"]]["Volume [mm^3]"])
+        battery_weight = float(BATTERIES[c["battery"]]["Weight [kg]"])
+        if constant_capacity == -1.0:
+            battery_capacity = float(BATTERIES[c["battery"]]["Capacity [Ah]"])
+        else:
+            battery_capacity = constant_capacity
+        battery_voltage = float(BATTERIES[c["battery"]]["Min Voltage [V]"])
+        row_string = "{},{},{},{},{},{}\n".format(c["battery"],
+                                                  c["series_count"],
+                                                  c["parallel_count"],
+                                                  calc_volume(battery_volume,
+                                                              c["series_count"], c["parallel_count"]),
+                                                  calc_weight(battery_weight,
+                                                              c["series_count"], c["parallel_count"]),
+                                                  calc_power(battery_capacity,
+                                                             battery_voltage,
+                                                             c["series_count"], c["parallel_count"]))
+        output_file.write(row_string)
+        # generate_rows(output_file, b, constant_capacity)
     output_file.close()
     print("Result table is saved to:", fname)
-
-
-def generate_rows(file_to_append, batt_name, constant_capacity, parallel_max=10):
-    batt_params = BATTERIES[batt_name]
-    if constant_capacity == -1.0:
-        batt_cap = float(batt_params["Capacity [Ah]"])
-    else:
-        print("Battery capacity is replaced with ", constant_capacity)
-        batt_cap = constant_capacity
-    batt_voltage = float(batt_params["Min Voltage [V]"])
-    batt_volume = float(batt_params["Volume [mm^3]"])
-    batt_weight = float(batt_params["Weight [kg]"])
-    batt_max_voltage = float(batt_params["Max Voltage [V]"])  # which one to use? 1)
-    batt_num_of_series_cells = int(batt_params["Number of Series Cells"])  # which one to use? 2)
-
-    for s in range(1, batt_num_of_series_cells + 1):
-        series_voltage = s * batt_voltage
-        series_volume = s * batt_volume
-        series_power = batt_cap * series_voltage
-        series_weight = s * batt_weight
-        for p in range(1, parallel_max):
-            total_voltage = series_voltage  # not written but useful
-            total_power = p * series_power
-            total_volume = p * series_volume
-            total_weight = p * series_weight
-
-            row_string = "{},{},{},{},{},{}\n".format(batt_name, s, p, total_volume, total_weight, total_power)
-            file_to_append.write(row_string)
-
-
-def battery_analyzer_sympy(batt_name="Tattu 22Ah Li", ):
-    capacity = sympy.Symbol("capacity")
-    voltage_request = sympy.Symbol("voltage_request")
-    base_voltage = sympy.Symbol("base_voltage")
-    module_volume = sympy.Symbol("module_volume")
-    volume_percent = sympy.Symbol("volume_percent")
-    chord_1 = sympy.Symbol("chord_1")
-    chord_2 = sympy.Symbol("chord_2")
-    thickness = sympy.Symbol("thickness")
-    span = sympy.Symbol("span")
-
-    series_count = sympy.ceiling(voltage_request / base_voltage)
-    min_pack_volume = series_count * module_volume
-    volume_ratio = volume_percent / 100.0
-    root_chord = sympy.Max(chord_1, chord_2)
-    tip_chord = sympy.Min(chord_1, chord_2)
-    A = root_chord / 2
-    B = thickness / 100 * A
-    C = tip_chord / 2
-    D = thickness / 100 * C
-    available_volume = 1 / 6 * span * (A * B + C * D + ((A + C) * (B + D)))
-    goal_volume = available_volume * volume_ratio
-    p_count = sympy.floor(goal_volume / min_pack_volume)
-    mega_pack_capacity = capacity * p_count  # output
-    actual_voltage = base_voltage * series_count  # output
-    print("Symbolic solution with substitution: ", end='')
-    print(mega_pack_capacity.evalf(subs={capacity: float(BATTERIES[batt_name]["Capacity [Ah]"]),
-                                         span: 3000.0,
-                                         volume_percent: 10.0,
-                                         thickness: 12.0,
-                                         chord_1: 1000.0,
-                                         chord_2: 1000.0,
-                                         module_volume: float(BATTERIES[batt_name]["Volume [mm^3]"]),
-                                         voltage_request: 51.8,
-                                         base_voltage: float(BATTERIES[batt_name]["Min Voltage [V]"])}))
 
 
 def battery_analyzer(batt_name="Tattu 22Ah Li", ):
@@ -130,7 +118,7 @@ def run(args=None):
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument('-a', '--a_batt', nargs='?', metavar="STR",
                         const="Tattu 22Ah Li", help="Analyzes given battery")
-    action.add_argument('--g_csv', nargs='?', metavar="PATH",
+    action.add_argument('-g', '--g_csv', nargs='?', metavar="PATH",
                         const="data_hackathon2_uam/Battery_analysis.csv",
                         help="Generates battery analysis table")
     parser.add_argument('--const_C', nargs=1, metavar="FLOAT",
@@ -144,9 +132,8 @@ def run(args=None):
             const_C = float(args.const_C)
         generate_csv(args.g_csv, const_C)
     else:
-        print("Used battery: ", args.a_batt)
+        print("Analyzed battery: ", args.a_batt)
         battery_analyzer(args.a_batt)
-        battery_analyzer_sympy(args.a_batt)
 
 
 if __name__ == '__main__':
