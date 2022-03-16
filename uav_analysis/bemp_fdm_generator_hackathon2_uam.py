@@ -200,15 +200,20 @@ def run(args=None):
                     MC = line.split()
                     print(f"MC {line}")
             # instrument code to view output
-            count += 1
-            if count == 1:
-                break
+            # count += 1
+            # if count == 1:
+            #     break
 
         try:
+            if len(MV) < len(MP):
+                MV[7] = MV[7][:5]
+                MV[8] = "NaN"
+
             for i in range(3, 11):
                 float(MV[i])
                 float(MP[i])
                 float(MC[i])
+                break
         except:
             print('\nInvalid fdm output detected for', combination["Battery.Name"],
                   combination["Motor.Name"], combination["Propeller.Name"])
