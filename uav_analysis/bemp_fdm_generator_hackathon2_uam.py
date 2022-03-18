@@ -161,8 +161,6 @@ def run(args=None):
         if args.battery and args.battery != combination["Battery.Name"]:
             continue
 
-        # combination['Aircraft.Mass'] = 0.347232355870562 + float(combination['Battery.Weight [kg]']) + \
-        #     4 * (float(combination['Motor.Weight [grams]'])/ 1000) + 4 * (float(combination['Propeller.Weight_g']) / 1000)
 
         # just consider the weight of the motor and propeller, kg 
         combination['Aircraft.Mass'] = (
@@ -253,14 +251,10 @@ def run(args=None):
                 continue
 
 
-            combined_weight = (float(combination['Motor.Weight [grams]']) + float(combination['Propeller.Weight_g']))/1000
-
-            # aircraft_thrust2weight = aircraft_thrust / (combination['Aircraft.Mass'] * 9.81)
-            # aircraft_flight_time = float(combination['Battery.Capacity [Ah]']) * 0.8 / (4 * aircraft_current)
 
 
             row += str(combination['Aircraft.Mass']) + "," + str(aircraft_thrust) + "," + \
-                str(aircraft_thrust) + "," + str(aircraft_power) + "," + str(combined_weight) + "\n"
+                str(aircraft_thrust) + "," + str(aircraft_power) + "," + "\n"
             res_file.write(row)
 
             sys.stdout.write('\r')
