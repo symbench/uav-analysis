@@ -24,7 +24,7 @@ from . import bemp_fdm_generator_hackathon1
 from . import mass_properties_hackathon1
 from . import testbench_data
 from . import bemp_combinations_hackathon2_uam
-from . import bemp_fdm_generator_hackathon2_uam
+from . import motor_propeller_analysis
 from . import battery_analysis
 from . import wing_analysis
 
@@ -35,7 +35,7 @@ def run():
     parser.add_argument('command', metavar="COMMAND", help=", ".join(sorted([
         "testbench-data", "mass-properties-hackathon1",
         "bemp-combinations-hackathon1", "bemp-fdm-generator-hackathon1",
-        "bemp-combinations-hackathon2", "bemp-fdm-generator-hackathon2",
+        "bemp-combinations-hackathon2", "motor-propeller-analysis",
         "battery-analysis", "wing-analysis"])))
     args = parser.parse_args(sys.argv[1:2])
 
@@ -53,8 +53,8 @@ def run():
         bemp_fdm_generator_hackathon1.run(args=sys.argv[2:])
     elif args.command == 'bemp-combinations-hackathon2':
         bemp_combinations_hackathon2_uam.run(args=sys.argv[2:])
-    elif args.command == 'bemp-fdm-generator-hackathon2':
-        bemp_fdm_generator_hackathon2_uam.run(args=sys.argv[2:])
+    elif args.command == 'motor-propeller-analysis':
+        motor_propeller_analysis.run(args=sys.argv[2:])
     elif args.command == 'battery-analysis':
         battery_analysis.run(args=sys.argv[2:])
     elif args.command == 'wing-analysis':

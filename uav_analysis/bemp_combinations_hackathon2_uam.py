@@ -52,8 +52,9 @@ def is_reversible_propeller(name: str) -> bool:
 
 def get_bemp_data(battery: str, motor: str, propeller: str) -> Dict[str, float]:
     data = dict()
-    for key, val in BATTERIES[battery].items():
-        data['Battery.' + key] = val
+    if battery is not None:
+        for key, val in BATTERIES[battery].items():
+            data['Battery.' + key] = val
     for key, val in MOTORS[motor].items():
         data['Motor.' + key] = val
     for key, val in PROPELLERS[propeller].items():
@@ -73,6 +74,17 @@ def battery_motor_propeller_generator(reversible: bool = True):
                 yield get_bemp_data(battery, motor, propeller)
 
 
+def motor_propeller_generator(reversible: bool = True):
+    for motor in MOTORS:
+        for propeller in PROPELLERS:
+            if reversible and not is_reversible_propeller(propeller):
+                continue
+            if MOTORS[motor]['(A) Shaft Diameter [mm]'] > PROPELLERS[propeller]['Shaft_Diameter_mm']:
+                continue
+
+            yield get_bemp_data(None, motor, propeller)
+
+
 def save_to_csv(generator, filename: str):
     with open(filename, 'w', newline='') as file:
         row = generator.__next__()
@@ -88,21 +100,11 @@ def run(args=None):
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--mode',
-                        default='quad-copter',
-                        choices=[
-                            'quad-copter',
-                        ],
-                        help='selects the generation mode')
     parser.add_argument('--save', type=str, metavar='FILE',
                         help="save the loaded data into a csv file")
     args = parser.parse_args(args)
 
-    if args.mode == 'quad-copter':
-        generator = battery_motor_propeller_generator(reversible=False)
-    else:
-        raise ValueError('invalid mode')
-
+    generator = battery_motor_propeller_generator(reversible=False)
     if args.save:
         print("Writing to", args.save)
         save_to_csv(generator, args.save)
