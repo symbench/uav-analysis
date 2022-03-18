@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (C) 2021, Gyorgy Kalmar
+# Copyright (C) 2021, Carlos Olea and Miklos Maroti
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -62,11 +62,11 @@ def generate_input(bemp_comb, propdata):
     str_return += "   propeller(1)%spin = 1\n"
     str_return += "\n"
     str_return += "!   Battery(1) is component named: Battery_0\n"
-    str_return += "   battery(1)%num_cells = 1\n"
-    str_return += "   battery(1)%voltage = 1000\n"
-    str_return += "   battery(1)%capacity = 100\n"
-    str_return += "   battery(1)%C_Continuous = 25\n"
-    str_return += "   battery(1)%C_Peak = 50\n"
+    str_return += "   battery(1)%num_cells = 0\n"
+    str_return += "   battery(1)%voltage = 0\n"
+    str_return += "   battery(1)%capacity = 0\n"
+    str_return += "   battery(1)%C_Continuous = 0\n"
+    str_return += "   battery(1)%C_Peak = 0\n"
     str_return += "/\n"
 
     return str_return

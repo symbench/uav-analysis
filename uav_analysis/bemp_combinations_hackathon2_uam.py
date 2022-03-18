@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (C) 2021, Miklos Maroti
+# Copyright (C) 2021, Miklos Maroti and Carlos Olea
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,11 +14,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Dict, Any, Union
+from typing import Dict, Any
 
 import csv
 import os
-import sys
 
 
 def load_static_data(name: str) -> Dict[str, Dict[str, Any]]:

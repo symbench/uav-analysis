@@ -21,39 +21,23 @@ def combination_generator(
                 }
 
 
-def calc_volume(battery_volume: float,
-                series_count: int,
-                parallel_count: int) -> float:
-    return parallel_count * (series_count * battery_volume)
-
-
-def calc_weight(battery_weight: float,
-                series_count: int,
-                parallel_count: int) -> float:
-    return parallel_count * (series_count * battery_weight)
-
-
-def calc_power(battery_cap: float,
-               battery_voltage: float,
-               series_count: int,
-               parallel_count: int) -> float:
-    return parallel_count * battery_cap * series_count * battery_voltage
-
-
 def generate_csv(
         fname: str,
-        constant_capacity: bool,
+        use_bug: bool,
         max_parallel: int,
         max_series: int,
         min_voltage: float,
-        max_voltage: float):
+        max_voltage: float,
+        min_energy: float,
+        max_weight: float,
+        min_current: float):
     try:
         output_file = open(fname, 'w')
     except OSError:
         print("Could not open file:", fname)
         sys.exit()
     output_file.write(
-        "NAME,BATTERY_VOLUME,BATTERY_WEIGHT,BATTERY_CAPACITY,SERIES_COUNT,PAR_COUNT,TOTAL_VOLUME,TOTAL_WEIGHT,TOTAL_POWER,TOTAL_VOLTAGE\n")
+        "NAME,BATTERY_VOLUME,BATTERY_WEIGHT,BATTERY_CAPACITY,BATTERY_CONT_DISCHARGE_RATE,SERIES_COUNT,PAR_COUNT,TOTAL_VOLUME,TOTAL_WEIGHT,TOTAL_ENERGY,TOTAL_VOLTAGE,TOTAL_CAPACITY,TOTAL_MAX_CURRENT\n")
 
     comb_generator = combination_generator(
         BATTERIES,
@@ -62,35 +46,59 @@ def generate_csv(
 
     count = 0
     for c in comb_generator:
+        parallel_count = c["parallel_count"]
+        series_count = c["series_count"]
+
         # print("Processing combination: ", c)
         battery = BATTERIES[c["battery"]]
-        battery_volume = float(battery["Volume [mm^3]"])
-        battery_weight = float(battery["Weight [kg]"])
-        if not constant_capacity:
-            battery_capacity = float(battery["Capacity [Ah]"])
-        else:
-            battery_capacity = 25.0  # check run_fd_calc.py
-        battery_voltage = float(battery["Min Voltage [V]"])
 
-        total_voltage = battery_voltage * c["parallel_count"]
+        battery_volume = float(battery["Volume [mm^3]"]) * 1e-9  # in m^3
+        battery_weight = float(battery["Weight [kg]"])
+
+        if use_bug:
+            battery_capacity = 25.0  # check run_fd_calc.py
+            battery_cont_discharge_rate = 25.0
+        else:
+            battery_capacity = float(battery["Capacity [Ah]"])
+            battery_cont_discharge_rate = float(
+                battery["Cont. Discharge Rate [C]"])
+
+        battery_voltage = float(battery["Min Voltage [V]"])
+        battery_power = battery_capacity * battery_voltage
+
+        total_volume = parallel_count * series_count * battery_volume
+
+        total_weight = parallel_count * series_count * battery_weight
+        if total_weight > max_weight:
+            continue
+
+        total_energy = parallel_count * series_count * battery_power
+        if total_energy < min_energy:
+            continue
+
+        total_voltage = series_count * battery_voltage
         if total_voltage < min_voltage or total_voltage > max_voltage:
             continue
 
-        row_string = "{},{},{},{},{},{},{},{},{},{}\n".format(
+        total_capacity = parallel_count * battery_capacity
+        total_max_current = total_capacity * battery_cont_discharge_rate
+        if total_max_current < min_current:
+            continue
+
+        row_string = "{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(
             c["battery"],
             battery_volume,
             battery_weight,
             battery_capacity,
-            c["series_count"],
-            c["parallel_count"],
-            calc_volume(battery_volume,
-                        c["series_count"], c["parallel_count"]),
-            calc_weight(battery_weight,
-                        c["series_count"], c["parallel_count"]),
-            calc_power(battery_capacity,
-                       battery_voltage,
-                       c["series_count"], c["parallel_count"]),
-            total_voltage
+            battery_cont_discharge_rate,
+            series_count,
+            parallel_count,
+            total_volume,       # (min)
+            total_weight,       # min
+            total_energy,       # max
+            total_voltage,
+            total_capacity,
+            total_max_current,  # max
         )
         output_file.write(row_string)
         count += 1
@@ -146,26 +154,35 @@ def run(args=None):
     action.add_argument('-o', '--output', nargs='?', metavar="PATH",
                         const="battery_analysis.csv",
                         help="Generates battery analysis table")
-    parser.add_argument('--const-cap', action="store_true", default=False,
-                        help="Ignores actual battery capacity and use 25 Ah")
+    parser.add_argument('--use-bug', action="store_true", default=False,
+                        help="Ignores actual battery capacity and discharge rate")
     parser.add_argument('--max-parallel', type=int, default=500, metavar="NUM",
                         help="sets the maximum parallel count")
     parser.add_argument('--max-series', type=int, default=100, metavar="NUM",
                         help="sets the maximum series count")
-    parser.add_argument('--min-voltage', type=float, default=100, metavar="NUM",
+    parser.add_argument('--min-voltage', type=float, default=100, metavar="V",
                         help="sets the minimum total voltage")
-    parser.add_argument('--max-voltage', type=float, default=1000, metavar="NUM",
+    parser.add_argument('--max-voltage', type=float, default=1000, metavar="V",
                         help="sets the maximum total voltage")
+    parser.add_argument('--min-energy', type=float, default=1000, metavar="WH",
+                        help="sets the minimum total energy in What hour")
+    parser.add_argument('--max-weight', type=float, default=500, metavar="KG",
+                        help="sets the maximum total weight")
+    parser.add_argument('--min-current', type=float, default=10, metavar="A",
+                        help="sets the minimum max current in Ampere")
 
     args = parser.parse_args(args)
     if args.output is not None:
         generate_csv(
             fname=args.output,
-            constant_capacity=args.const_cap,
+            use_bug=args.use_bug,
             max_parallel=args.max_parallel,
             max_series=args.max_series,
             min_voltage=args.min_voltage,
             max_voltage=args.max_voltage,
+            min_energy=args.min_energy,
+            max_weight=args.max_weight,
+            min_current=args.min_current,
         )
     else:
         print("Analyzed battery: ", args.a_batt)
