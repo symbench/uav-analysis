@@ -75,11 +75,11 @@ def generate_input(bemp_comb, propdata, fixedBatteryParams=False):
         bemp_comb["Battery.Peak Discharge Rate [C]"])
     str_return += "/\n"
 
-    print(f"--- BATTERY PARAMS (fixbatt={fixedBatteryParams}): ---")
-    print(f"VOLTAGE: {bemp_comb['Battery.Min Voltage [V]']}")
-    print(f"CAPACITY: {bemp_comb['Battery.Capacity [Ah]']}")
-    print(f"CONT_DIS: {bemp_comb['Battery.Cont. Discharge Rate [C]']}")
-    print(f"PEAK_DIS: {bemp_comb['Battery.Peak Discharge Rate [C]']}")
+    # print(f"--- BATTERY PARAMS (fixbatt={fixedBatteryParams}): ---")
+    # print(f"VOLTAGE: {bemp_comb['Battery.Min Voltage [V]']}")
+    # print(f"CAPACITY: {bemp_comb['Battery.Capacity [Ah]']}")
+    # print(f"CONT_DIS: {bemp_comb['Battery.Cont. Discharge Rate [C]']}")
+    # print(f"PEAK_DIS: {bemp_comb['Battery.Peak Discharge Rate [C]']}")
 
 
     return str_return
@@ -134,7 +134,7 @@ def run(args=None):
                     "MP_omega_rad,MP_omega_RPM,MP_Voltage,MP_Thrust,MP_Torque,MP_Power,MP_Current,MP_Efficiency," \
                     "MC_omega_rad,MC_omega_RPM,MC_Voltage,MC_Thrust,MC_Torque,MC_Power,MC_Current,MC_Efficiency," \
                     "MaxPower,MaxCur,PeakCur,ContCur," \
-                    "Aircraft_Weight,Aircraft_Thrust,Aircraft_Thrust2Weight,Aircraft_FlightTime\n"
+                    "Aircraft_Weight,Aircraft_Thrust,Best_Thrust,Best_Power,Motor_Propeller_Weight\n"
     
     # modified to consider mainly motor and propeller
     # output_header = "Battery,Motor,Propeller,Battery_Weight,Battery_Capacity,Motor_Weight,Propeller_Weight," \
@@ -186,19 +186,19 @@ def run(args=None):
             for line in file_object.readlines():
                 line = line.strip()
 
-                if line.startswith("Motor #"):
-                    print(f"\t{line}")
-                if line.startswith("(rad/s)"):
-                    print(f"\t\t  {line}")
+                # if line.startswith("Motor #"):
+                #     print(f"\t{line}")
+                # if line.startswith("(rad/s)"):
+                #     print(f"\t\t  {line}")
                 if line.startswith("Max Volt  1"):
                     MV = line.split()
-                    print(f"MV {line}")
+                    # print(f"MV {line}")
                 elif line.startswith("Max Power 1"):
                     MP = line.split()
-                    print(f"MP {line}")
+                    # print(f"MP {line}")
                 elif line.startswith("Max Amps  1"):
                     MC = line.split()
-                    print(f"MC {line}")
+                    # print(f"MC {line}")
             # instrument code to view output
             # count += 1
             # if count == 1:
@@ -218,50 +218,62 @@ def run(args=None):
             print('\nInvalid fdm output detected for', combination["Battery.Name"],
                   combination["Motor.Name"], combination["Propeller.Name"])
             continue
+        try:
+            row = ""
+            row += combination["Battery.Name"] + ","
+            row += combination["Motor.Name"] + ","
+            row += combination["Propeller.Name"] + ","
+            row += combination['Battery.Weight [kg]'] + ","
+            row += combination['Battery.Capacity [Ah]'] + ","
+            row += str(float(combination['Motor.Weight [grams]']) / 1000) + ","
+            row += str(float(combination['Propeller.Weight_g']) / 1000) + ","
+            row += MV[3] + "," + MV[4] + "," + MV[5] + "," + MV[6] + "," + \
+                MV[7] + "," + MV[8] + "," + MV[9] + "," + MV[10] + ","
+            row += MP[3] + "," + MP[4] + "," + MP[5] + "," + MP[6] + "," + \
+                MP[7] + "," + MP[8] + "," + MP[9] + "," + MP[10] + ","
+            row += MC[3] + "," + MC[4] + "," + MC[5] + "," + MC[6] + "," + \
+                MC[7] + "," + MC[8] + "," + MC[9] + "," + MC[10] + ","
+            row += MC[11] + "," + MC[12] + "," + MC[13] + "," + MC[14] + ","
 
-        row = ""
-        row += combination["Battery.Name"] + ","
-        row += combination["Motor.Name"] + ","
-        row += combination["Propeller.Name"] + ","
-        row += combination['Battery.Weight [kg]'] + ","
-        row += combination['Battery.Capacity [Ah]'] + ","
-        row += str(float(combination['Motor.Weight [grams]']) / 1000) + ","
-        row += str(float(combination['Propeller.Weight_g']) / 1000) + ","
-        row += MV[3] + "," + MV[4] + "," + MV[5] + "," + MV[6] + "," + \
-            MV[7] + "," + MV[8] + "," + MV[9] + "," + MV[10] + ","
-        row += MP[3] + "," + MP[4] + "," + MP[5] + "," + MP[6] + "," + \
-            MP[7] + "," + MP[8] + "," + MP[9] + "," + MP[10] + ","
-        row += MC[3] + "," + MC[4] + "," + MC[5] + "," + MC[6] + "," + \
-            MC[7] + "," + MC[8] + "," + MC[9] + "," + MC[10] + ","
-        row += MC[11] + "," + MC[12] + "," + MC[13] + "," + MC[14] + ","
-
-        # maximum achievable thrust
-        aircraft_thrust = 1e99
-        aircraft_current = None
-        for M in [MV, MP, MC]:
-            t = float(M[6])  # thrust
-            c = float(M[9])  # current
-            if math.isnan(t) or math.isnan(c):
+            # maximum achievable thrust
+            aircraft_thrust = 1e99
+            aircraft_power = 1e99
+            aircraft_current = None
+            for M in [MV, MP, MC]:
+                t = float(M[6])  # thrust
+                p = float(M[8])
+                c = float(M[9])  # current
+                if math.isnan(t) or math.isnan(c):
+                    continue
+                if p < aircraft_power:
+                    aircraft_power = p
+                    aircraft_thrust = t
+                    aircraft_current = c
+            if aircraft_current is None:
                 continue
-            if t < aircraft_thrust:
-                aircraft_thrust = t
-                aircraft_current = c
-        if aircraft_current is None:
-            continue
 
-        aircraft_thrust2weight = aircraft_thrust / (combination['Aircraft.Mass'] * 9.81)
-        aircraft_flight_time = float(combination['Battery.Capacity [Ah]']) * 0.8 / (4 * aircraft_current)
 
-        row += str(combination['Aircraft.Mass']) + "," + str(aircraft_thrust) + "," + \
-            str(aircraft_thrust2weight) + "," + str(aircraft_flight_time) + "\n"
-        res_file.write(row)
+            combined_weight = (float(combination['Motor.Weight [grams]']) + float(combination['Propeller.Weight_g']))/1000
 
-        sys.stdout.write('\r')
-        sys.stdout.write("{:10.2f}%".format(100 * cnt / num_of_combinations))
-        sys.stdout.flush()
-        cnt += 1
-        if args.limit >= 0 and cnt >= args.limit + 1:
-            break
+            # aircraft_thrust2weight = aircraft_thrust / (combination['Aircraft.Mass'] * 9.81)
+            # aircraft_flight_time = float(combination['Battery.Capacity [Ah]']) * 0.8 / (4 * aircraft_current)
+
+
+            row += str(combination['Aircraft.Mass']) + "," + str(aircraft_thrust) + "," + \
+                str(aircraft_thrust) + "," + str(aircraft_power) + "," + str(combined_weight) + "\n"
+            res_file.write(row)
+
+            sys.stdout.write('\r')
+            sys.stdout.write("{:10.2f}%".format(100 * cnt / num_of_combinations))
+            sys.stdout.flush()
+            cnt += 1
+            if args.limit >= 0 and cnt >= args.limit + 1:
+                break
+        except:
+            print(MV)
+            print(MC)
+
+        
     print()
     print("---------------------------------------")
     print("Results are saved in file: ", res_fname)
