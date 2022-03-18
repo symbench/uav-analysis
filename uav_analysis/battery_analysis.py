@@ -40,38 +40,63 @@ def calc_power(battery_cap: float,
     return parallel_count * battery_cap * series_count * battery_voltage
 
 
-def generate_csv(fname, constant_capacity):
+def generate_csv(
+        fname: str,
+        constant_capacity: bool,
+        max_parallel: int,
+        max_series: int,
+        min_voltage: float,
+        max_voltage: float):
     try:
         output_file = open(fname, 'w')
     except OSError:
         print("Could not open file:", fname)
         sys.exit()
-    output_file.write("NAME,SERIES_COUNT,PAR_COUNT,VOLUME,WEIGHT,POWER\n")
+    output_file.write(
+        "NAME,BATTERY_VOLUME,BATTERY_WEIGHT,BATTERY_CAPACITY,SERIES_COUNT,PAR_COUNT,TOTAL_VOLUME,TOTAL_WEIGHT,TOTAL_POWER,TOTAL_VOLTAGE\n")
 
-    comb_generator = combination_generator(BATTERIES, 10, 10)
+    comb_generator = combination_generator(
+        BATTERIES,
+        max_series=max_series,
+        max_parallel=max_parallel)
+
+    count = 0
     for c in comb_generator:
-        print("Processing combination: ", c)
-        battery_volume = float(BATTERIES[c["battery"]]["Volume [mm^3]"])
-        battery_weight = float(BATTERIES[c["battery"]]["Weight [kg]"])
-        if constant_capacity == -1.0:
-            battery_capacity = float(BATTERIES[c["battery"]]["Capacity [Ah]"])
+        # print("Processing combination: ", c)
+        battery = BATTERIES[c["battery"]]
+        battery_volume = float(battery["Volume [mm^3]"])
+        battery_weight = float(battery["Weight [kg]"])
+        if not constant_capacity:
+            battery_capacity = float(battery["Capacity [Ah]"])
         else:
-            battery_capacity = constant_capacity
-        battery_voltage = float(BATTERIES[c["battery"]]["Min Voltage [V]"])
-        row_string = "{},{},{},{},{},{}\n".format(c["battery"],
-                                                  c["series_count"],
-                                                  c["parallel_count"],
-                                                  calc_volume(battery_volume,
-                                                              c["series_count"], c["parallel_count"]),
-                                                  calc_weight(battery_weight,
-                                                              c["series_count"], c["parallel_count"]),
-                                                  calc_power(battery_capacity,
-                                                             battery_voltage,
-                                                             c["series_count"], c["parallel_count"]))
+            battery_capacity = 25.0  # check run_fd_calc.py
+        battery_voltage = float(battery["Min Voltage [V]"])
+
+        total_voltage = battery_voltage * c["parallel_count"]
+        if total_voltage < min_voltage or total_voltage > max_voltage:
+            continue
+
+        row_string = "{},{},{},{},{},{},{},{},{},{}\n".format(
+            c["battery"],
+            battery_volume,
+            battery_weight,
+            battery_capacity,
+            c["series_count"],
+            c["parallel_count"],
+            calc_volume(battery_volume,
+                        c["series_count"], c["parallel_count"]),
+            calc_weight(battery_weight,
+                        c["series_count"], c["parallel_count"]),
+            calc_power(battery_capacity,
+                       battery_voltage,
+                       c["series_count"], c["parallel_count"]),
+            total_voltage
+        )
         output_file.write(row_string)
-        # generate_rows(output_file, b, constant_capacity)
+        count += 1
+
     output_file.close()
-    print("Result table is saved to:", fname)
+    print("Result table with", count, "rows is saved to:", fname)
 
 
 def battery_analyzer(batt_name="Tattu 22Ah Li", ):
@@ -116,21 +141,32 @@ def run(args=None):
 
     parser = argparse.ArgumentParser()
     action = parser.add_mutually_exclusive_group(required=True)
-    action.add_argument('-a', '--a_batt', nargs='?', metavar="STR",
+    action.add_argument('-a', '--a-batt', nargs='?', metavar="STR",
                         const="Tattu 22Ah Li", help="Analyzes given battery")
-    action.add_argument('-g', '--g_csv', nargs='?', metavar="PATH",
-                        const="data_hackathon2_uam/Battery_analysis.csv",
+    action.add_argument('-o', '--output', nargs='?', metavar="PATH",
+                        const="battery_analysis.csv",
                         help="Generates battery analysis table")
-    parser.add_argument('--const_C', nargs=1, metavar="FLOAT",
-                        default=-1.0, help="Ignores actual battery capacity and replaces with 'const_C'")
+    parser.add_argument('--const-cap', action="store_true", default=False,
+                        help="Ignores actual battery capacity and use 25 Ah")
+    parser.add_argument('--max-parallel', type=int, default=500, metavar="NUM",
+                        help="sets the maximum parallel count")
+    parser.add_argument('--max-series', type=int, default=100, metavar="NUM",
+                        help="sets the maximum series count")
+    parser.add_argument('--min-voltage', type=float, default=100, metavar="NUM",
+                        help="sets the minimum total voltage")
+    parser.add_argument('--max-voltage', type=float, default=1000, metavar="NUM",
+                        help="sets the maximum total voltage")
 
     args = parser.parse_args(args)
-    if args.g_csv is not None:
-        if isinstance(args.const_C, List):
-            const_C = float(args.const_C[0])
-        else:
-            const_C = float(args.const_C)
-        generate_csv(args.g_csv, const_C)
+    if args.output is not None:
+        generate_csv(
+            fname=args.output,
+            constant_capacity=args.const_cap,
+            max_parallel=args.max_parallel,
+            max_series=args.max_series,
+            min_voltage=args.min_voltage,
+            max_voltage=args.max_voltage,
+        )
     else:
         print("Analyzed battery: ", args.a_batt)
         battery_analyzer(args.a_batt)
