@@ -22,7 +22,7 @@ import math
 import os
 import re
 
-from .bemp_combinations_hackathon2_uam import WINGS
+from .components import WINGS
 
 
 NACA_PROFILE = re.compile(r"^NACA (\d)(\d)(\d\d)$")

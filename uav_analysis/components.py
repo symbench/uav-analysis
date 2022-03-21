@@ -44,11 +44,6 @@ WING_NAMES = sorted(WINGS.keys())
 MOTOR_NAMES = sorted(MOTORS.keys())
 
 
-def is_reversible_propeller(name: str) -> bool:
-    assert name in PROPELLERS
-    return name + 'P' in PROPELLERS
-
-
 def get_bemp_data(battery: str, motor: str, propeller: str) -> Dict[str, float]:
     data = dict()
     if battery is not None:
@@ -61,52 +56,20 @@ def get_bemp_data(battery: str, motor: str, propeller: str) -> Dict[str, float]:
     return data
 
 
-def battery_motor_propeller_generator(reversible: bool = True):
+def battery_motor_propeller_generator():
     for battery in BATTERIES:
         for motor in MOTORS:
             for propeller in PROPELLERS:
-                if reversible and not is_reversible_propeller(propeller):
-                    continue
                 if MOTORS[motor]['(A) Shaft Diameter [mm]'] > PROPELLERS[propeller]['Shaft_Diameter_mm']:
                     continue
 
                 yield get_bemp_data(battery, motor, propeller)
 
 
-def motor_propeller_generator(reversible: bool = True):
+def motor_propeller_generator():
     for motor in MOTORS:
         for propeller in PROPELLERS:
-            if reversible and not is_reversible_propeller(propeller):
-                continue
             if MOTORS[motor]['(A) Shaft Diameter [mm]'] > PROPELLERS[propeller]['Shaft_Diameter_mm']:
                 continue
 
             yield get_bemp_data(None, motor, propeller)
-
-
-def save_to_csv(generator, filename: str):
-    with open(filename, 'w', newline='') as file:
-        row = generator.__next__()
-        writer = csv.DictWriter(file, row.keys())
-        writer.writeheader()
-        writer.writerow(row)
-        for row in generator:
-            writer.writerow(row)
-
-
-def run(args=None):
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--save', type=str, metavar='FILE',
-                        help="save the loaded data into a csv file")
-    args = parser.parse_args(args)
-
-    generator = battery_motor_propeller_generator(reversible=False)
-    if args.save:
-        print("Writing to", args.save)
-        save_to_csv(generator, args.save)
-    else:
-        for entry in generator:
-            print(entry)

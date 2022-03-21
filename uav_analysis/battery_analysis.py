@@ -2,8 +2,7 @@ import math
 import sys
 from typing import List, Iterable, Generator
 
-import sympy
-from uav_analysis.bemp_combinations_hackathon2_uam import BATTERIES
+from .components import BATTERIES
 
 
 def combination_generator(

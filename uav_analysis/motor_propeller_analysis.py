@@ -19,7 +19,7 @@ import os
 import sys
 
 
-from uav_analysis.bemp_combinations_hackathon2_uam import motor_propeller_generator
+from .components import motor_propeller_generator
 
 
 def generate_input(bemp_comb, propdata):
