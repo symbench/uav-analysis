@@ -14,15 +14,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from typing import Any, Dict, Iterable, Optional
+
+import csv
 import math
 import os
 import sys
 
+from .components import MOTORS, PROPELLERS, motor_propeller_generator
 
-from .components import motor_propeller_generator
 
-
-def generate_input(bemp_comb, propdata):
+def generate_fdm_input(bemp_comb: Dict[str, Any], propdata: str) -> str:
     str_return = "&aircraft_data\n"
     str_return += "   aircraft%cname           = 'UAV'\n"
     str_return += "   aircraft%ctype           = 'SymCPS UAV Design'\n"
@@ -72,6 +74,100 @@ def generate_input(bemp_comb, propdata):
     return str_return
 
 
+def run_new_fdm(fdm_binary: str, fdm_input: str) -> str:
+    with open('motor_propeller_analysis.inp', 'w') as file:
+        file.write(fdm_input)
+
+    cmd = "{} < motor_propeller_analysis.inp > motor_propeller_analysis.out".format(
+        fdm_binary)
+    status = os.system(cmd)
+    if status == 2:
+        raise KeyboardInterrupt
+
+    with open('motor_propeller_analysis.out', 'r') as file:
+        return file.read()
+
+
+def parse_fdm_output(fdm_output: str) -> Optional[Dict[str, float]]:
+    try:
+        result = dict()
+        for line in fdm_output.splitlines():
+            if line.startswith(" Max Power 1"):
+                linetype = "MaxPower."
+            elif line.startswith(" Max Amps  1"):
+                linetype = "MaxAmps."
+            else:
+                continue
+
+            result[linetype + "OmegaRpm"] = float(line[22:32])
+            result[linetype + "Voltage"] = float(line[32:42])
+            result[linetype + "Thrust"] = float(line[42:52])
+            result[linetype + "Torque"] = float(line[52:62])
+            result[linetype + "Power"] = float(line[62:72])
+            result[linetype + "Current"] = float(line[72:82])
+            result[linetype + "MaxPower"] = float(line[92:102])
+            result[linetype + "MaxCurrent"] = float(line[102:112])
+
+        assert 'MaxPower.Voltage' in result and 'MaxAmps.Voltage' in result
+        return result
+
+    except:
+        return None
+
+
+def create_datapoint(combination: Dict[str, Any],
+                     output_data: Dict[str, Any]) -> Dict[str, Any]:
+    result = dict()
+    result["Motor.Name"] = combination["Motor.Name"]
+    result["Motor.Weight"] = float(combination['Motor.Weight [grams]']) / 1000
+    result["Propeller.Name"] = combination["Propeller.Name"]
+    result["Propeller.Weight"] = float(
+        combination['Propeller.Weight_g']) / 1000
+
+    result.update(output_data)
+
+    result['Combined.Weight'] = result['Motor.Weight'] + \
+        result['Propeller.Weight']
+
+    if result['MaxPower.Power'] < result['MaxAmps.Power']:
+        prefix = "MaxPower."
+    else:
+        prefix = "MaxAmps."
+
+    for name in ["OmegaRpm", "Voltage", "Thrust", "Torque", "Power", "Current"]:
+        result["Combined.Max" + name] = result[prefix + name]
+
+    result["Combined.MaxThrustPerWeight"] = result["Combined.MaxThrust"] / \
+        result["Combined.Weight"]
+    result["Combined.MaxPowerPerWeight"] = result["Combined.MaxPower"] / \
+        result["Combined.Weight"]
+
+    return result
+
+
+def datapoint_generator(
+    propeller: Optional[str],
+    motor: Optional[str],
+    fdm_binary: str,
+    propdata: str,
+):
+    generator = motor_propeller_generator()
+
+    for combination in generator:
+        if propeller and propeller != combination["Propeller.Name"]:
+            continue
+        if motor and motor != combination["Motor.Name"]:
+            continue
+
+        fdm_input = generate_fdm_input(combination, propdata)
+        fdm_output = run_new_fdm(fdm_binary, fdm_input)
+        output_data = parse_fdm_output(fdm_output)
+        if output_data is None:
+            continue
+
+        yield create_datapoint(combination, output_data)
+
+
 def run(args=None):
     import argparse
 
@@ -89,7 +185,7 @@ def run(args=None):
                         metavar='FILENAME',
                         help="output file name")
     parser.add_argument('--limit',
-                        default=-1,
+                        default=None,
                         type=int,
                         metavar='NUM',
                         help="process only LIMIT number of combinations")
@@ -104,124 +200,34 @@ def run(args=None):
     parser.add_argument('--motor',
                         metavar='NAME',
                         help='limits the search space to this motor')
-    parser.add_argument('--reversible',
-                        action='store_true',
-                        help='consider only reversible propellers')
 
     args = parser.parse_args(args)
 
-    generator = motor_propeller_generator(reversible=args.reversible)
-    output_header = "Motor,Propeller,Motor_Weight,Propeller_Weight," \
-                    "MP_omega_rad,MP_omega_RPM,MP_Voltage,MP_Thrust,MP_Torque,MP_Power,MP_Current,MP_Efficiency," \
-                    "MC_omega_rad,MC_omega_RPM,MC_Voltage,MC_Thrust,MC_Torque,MC_Power,MC_Current,MC_Efficiency," \
-                    "MaxPower,MaxCur," \
-                    "Total_Weight,Total_Thrust,Total_Power,Total_Current\n"
+    datapoints = datapoint_generator(
+        propeller=args.propeller,
+        motor=args.motor,
+        fdm_binary=args.fdm,
+        propdata=args.propdata)
 
-    res_fname = args.output
-    res_file = open(res_fname, 'w')
-    res_file.write(output_header)
-    cnt = 1
-    if args.limit == -1:
-        num_of_combinations = 200_000  # donno yet
-    else:
-        num_of_combinations = args.limit
+    total = len(MOTORS) * len(PROPELLERS)
     print("Progress: ")
-    for combination in generator:
-        if args.propeller and args.propeller != combination["Propeller.Name"]:
-            continue
-        if args.motor and args.motor != combination["Motor.Name"]:
-            continue
 
-        with open('fdm_input.txt', 'w') as file_object:
-            file_object.write(generate_input(combination, args.propdata))
-
-        combo_name = "fdm_output.txt"
-        cmd = "{} < fdm_input.txt > {}".format(args.fdm, combo_name)
-        status = os.system(cmd)
-        if status == 2:
-            raise KeyboardInterrupt
-
-        MP = None
-        MC = None
-        count = 0
-        with open(combo_name, 'r') as file_object:
-            for line in file_object.readlines():
-                line = line.strip()
-
-                # if line.startswith("Motor #"):
-                #     print(f"\t{line}")
-                # if line.startswith("(rad/s)"):
-                #     print(f"\t\t  {line}")
-                if line.startswith("Max Power 1"):
-                    MP = line.split()
-                    # print(f"MP {line}")
-                elif line.startswith("Max Amps  1"):
-                    MC = line.split()
-                    # print(f"MC {line}")
-            # instrument code to view output
-            # count += 1
-            # if count == 1:
-            #     break
-
-        try:
-            for i in range(3, 11):
-                float(MP[i])
-                float(MC[i])
-                break
-        except:
-            print('\nInvalid fdm output detected for',
-                  combination["Motor.Name"], combination["Propeller.Name"])
-            continue
-        try:
-            row = ""
-            row += combination["Motor.Name"] + ","
-            row += combination["Propeller.Name"] + ","
-            row += str(float(combination['Motor.Weight [grams]']) / 1000) + ","
-            row += str(float(combination['Propeller.Weight_g']) / 1000) + ","
-            row += MP[3] + "," + MP[4] + "," + MP[5] + "," + MP[6] + "," + \
-                MP[7] + "," + MP[8] + "," + MP[9] + "," + MP[10] + ","
-            row += MC[3] + "," + MC[4] + "," + MC[5] + "," + MC[6] + "," + \
-                MC[7] + "," + MC[8] + "," + MC[9] + "," + MC[10] + ","
-            row += MC[11] + "," + MC[12] + ","
-
-            total_weight = (float(combination['Motor.Weight [grams]']) / 1000) + (
-                float(combination['Propeller.Weight_g']) / 1000)
-
-            # maximum achievable thrust
-            total_thrust = None
-            total_power = 1e99
-            total_current = None
-            for M in [MP, MC]:
-                t = float(M[6])  # thrust
-                p = float(M[8])  # power
-                c = float(M[9])  # current
-                if math.isnan(t) or math.isnan(c):
-                    continue
-                if p < total_power:
-                    total_power = p
-                    total_thrust = t
-                    total_current = c
-            if total_current is None:
-                continue
-
-            row += str(total_weight) + "," + str(total_thrust) + "," + \
-                str(total_power) + "," + str(total_current) + "\n"
-            res_file.write(row)
-
-            sys.stdout.write('\r')
-            sys.stdout.write("{:10.2f}%".format(
-                100 * cnt / num_of_combinations))
-            sys.stdout.flush()
+    with open(args.output, 'w', newline='') as file:
+        row = next(datapoints)
+        writer = csv.DictWriter(file, row.keys())
+        writer.writeheader()
+        writer.writerow(row)
+        cnt = 0
+        for row in datapoints:
+            writer.writerow(row)
+            if cnt % 100 == 0:
+                sys.stdout.write("\r{:6.2f}%".format(100 * cnt / total))
+                sys.stdout.flush()
             cnt += 1
-            if args.limit >= 0 and cnt >= args.limit + 1:
+            if args.limit and cnt >= args.limit:
                 break
-        except:
-            print(MC)
 
-    print()
-    print("---------------------------------------")
-    print("Results are saved in file: ", res_fname)
-    res_file.close()
+        print("\nResults saved to", args.output)
 
 
 if __name__ == '__main__':
