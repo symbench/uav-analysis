@@ -19,10 +19,12 @@ from typing import Dict, Any
 import csv
 import os
 
+DATAPATH = os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                        'data_hackathon2_uam')
+
 
 def load_static_data(name: str) -> Dict[str, Dict[str, Any]]:
-    filename = os.path.abspath(os.path.dirname(__file__))
-    filename = os.path.join(filename, 'data_hackathon2_uam', name + '.csv')
+    filename = os.path.join(DATAPATH, name + '.csv')
 
     result = dict()
     with open(filename) as file:

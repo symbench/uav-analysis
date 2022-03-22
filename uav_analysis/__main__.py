@@ -26,6 +26,7 @@ from . import testbench_data
 from . import motor_propeller_analysis
 from . import battery_analysis
 from . import wing_analysis
+from . import component_analysis
 
 
 def run():
@@ -39,6 +40,7 @@ def run():
         "motor-propeller-analysis",
         "battery-analysis",
         "wing-analysis",
+        "component-analysis",
     ])))
     args = parser.parse_args(sys.argv[1:2])
 
@@ -60,6 +62,8 @@ def run():
         battery_analysis.run(args=sys.argv[2:])
     elif args.command == 'wing-analysis':
         wing_analysis.run(args=sys.argv[2:])
+    elif args.command == 'component-analysis':
+        component_analysis.run(args=sys.argv[2:])
     else:
         parser.print_help()
 
