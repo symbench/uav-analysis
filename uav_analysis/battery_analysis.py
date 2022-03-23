@@ -69,12 +69,11 @@ def generate_csv(
 
         battery_volume = float(battery["Volume [mm^3]"]) * 1e-9  # in m^3
         battery_weight = float(battery["Weight [kg]"])
+        battery_capacity = float(battery["Capacity [Ah]"])
 
         if use_bug:
-            battery_capacity = 25.0  # check run_fd_calc.py
             battery_cont_discharge_rate = 25.0
         else:
-            battery_capacity = float(battery["Capacity [Ah]"])
             battery_cont_discharge_rate = float(
                 battery["Cont. Discharge Rate [C]"])
 
@@ -162,7 +161,8 @@ def battery_analyzer(batt_name="Tattu 22Ah Li", ):
 def run(args=None):
     import argparse
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument('-a', '--a-batt', nargs='?', metavar="STR",
                         const="Tattu 22Ah Li", help="Analyzes given battery")
@@ -170,7 +170,7 @@ def run(args=None):
                         const="battery_analysis.csv",
                         help="Generates battery analysis table")
     parser.add_argument('--use-bug', action="store_true", default=False,
-                        help="Ignores actual battery capacity and discharge rate")
+                        help="use 25C battery discharge rate")
     parser.add_argument('--max-parallel', type=int, default=500, metavar="NUM",
                         help="sets the maximum parallel count")
     parser.add_argument('--max-series', type=int, default=100, metavar="NUM",
@@ -181,7 +181,7 @@ def run(args=None):
                         help="sets the maximum total voltage")
     parser.add_argument('--min-energy', type=float, default=1000, metavar="WH",
                         help="sets the minimum total energy in What hour")
-    parser.add_argument('--max-weight', type=float, default=500, metavar="KG",
+    parser.add_argument('--max-weight', type=float, default=1000, metavar="KG",
                         help="sets the maximum total weight")
     parser.add_argument('--min-current', type=float, default=10, metavar="A",
                         help="sets the minimum max current in Ampere")

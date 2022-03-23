@@ -17,8 +17,6 @@
 import argparse
 import sys
 
-from click import command
-
 from . import bemp_combinations_hackathon1
 from . import bemp_fdm_generator_hackathon1
 from . import mass_properties_hackathon1
