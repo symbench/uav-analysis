@@ -52,13 +52,14 @@ class Component():
 
 class Fuselage(Component):
     CONNECTORS = {
-        "Top_Connector": [],
-        "Bottom_Connector": [],
-        "Left_Connector": [],
-        "Right_Connector": [],
-        "Rear_Connector": [],
+        "TOP_CONNECTOR": [],
+        "BOTTOM_CONNECTOR": [],
+        "LEFT_CONNECTOR": [],
+        "RIGHT_CONNECTOR": [],
+        "REAR_CONNECTOR": [],
         "Seat_1_Connector": [],
         "Seat_2_Connector": [],
+        "ORIENT": [],
     }
 
     COMPONENT_TYPES = [
@@ -68,21 +69,31 @@ class Fuselage(Component):
 
     COMPONENT_KIND = "Fuselage"
 
-    def __init__(self, name: str, type: str):
+    def __init__(self, name: str, type: str,
+                 sphere_diameter: float,
+                 length: float,
+                 middle_length: float,
+                 floor_height: float,
+                 tail_diameter: float,
+                 seat_1_lr: float,
+                 seat_1_fb: float,
+                 seat_2_lr: float,
+                 seat_2_fb: float,
+                 port_thickness: float):
         super(Fuselage, self).__init__(
             name=name,
             type=type,
             parameters={
-                "SPHERE_DIAMETER": 1520.0,
-                "LENGTH": 2000.0,
-                "MIDDLE_LENGTH": 750.0,
-                "TAIL_DIAMETER": 200.0,
-                "SEAT_1_LR": -200.0,
-                "SEAT_1_FB": 1000.0,
-                "SEAT_2_LR": 200.0,
-                "SEAT_2_FB": 1000.0,
-                "FLOOR_HEIGHT": 150.0,
-                "PORT_THICKNESS": 100.0,
+                "SPHERE_DIAMETER": sphere_diameter,
+                "LENGTH": length,
+                "MIDDLE_LENGTH": middle_length,
+                "TAIL_DIAMETER": tail_diameter,
+                "SEAT_1_LR": seat_1_lr,
+                "SEAT_1_FB": seat_1_fb,
+                "SEAT_2_LR": seat_2_lr,
+                "SEAT_2_FB": seat_2_fb,
+                "FLOOR_HEIGHT": floor_height,
+                "PORT_THICKNESS": port_thickness,
                 "TOP_PORT_DISP": 0.0,
                 "BOTTOM_PORT_DISP": 0.0,
                 "LEFT_PORT_DISP": 0.0,
@@ -116,11 +127,11 @@ class Motor(Component):
     CONNECTORS = {
         "Prop_Connector": [],
         "Base_Connector": [
-            "Fuselage.Top_Connector",
-            "Fuselage.Bottom_Connector",
-            "Fuselage.Left_Connector",
-            "Fuselage.Right_Connector",
-            "Fuselage.Rear_Connector",
+            "Fuselage.TOP_CONNECTOR",
+            "Fuselage.BOTTOM_CONNECTOR",
+            "Fuselage.LEFT_CONNECTOR",
+            "Fuselage.RIGHT_CONNECTOR",
+            "Fuselage.REAR_CONNECTOR",
             "Beam.TOP_CONNECTOR_IN",
             "Beam.BOTTOM_CONNECTOR_OUT",
         ],
@@ -176,15 +187,11 @@ class BatteryController(Component):
 
     COMPONENT_KIND = "BatteryController"
 
-    def __init__(self, name: str,
-                 voltage: float):
+    def __init__(self, name: str):
         super(BatteryController, self).__init__(
             name=name,
             type="BatteryController",
             parameters={
-                # TODO: check if this works
-                "Input_Voltage": voltage,
-                "Output_Voltage": voltage,
             })
 
 
@@ -253,17 +260,17 @@ class Battery(Component):
 
 class WingMount(Component):
     CONNECTORS = {
-        "Bottom_connector": [
-            "Fuselage.Top_Connector",
-            "Fuselage.Bottom_Connector",
-            "Fuselage.Left_Connector",
-            "Fuselage.Right_Connector",
-            "Fuselage.Rear_Connector",
+        "BOTTOM_CONNECTOR": [
+            "Fuselage.TOP_CONNECTOR",
+            "Fuselage.BOTTOM_CONNECTOR",
+            "Fuselage.LEFT_CONNECTOR",
+            "Fuselage.RIGHT_CONNECTOR",
+            "Fuselage.REAR_CONNECTOR",
             "Beam.TOP_CONNECTOR_IN",
             "Beam.BOTTOM_CONNECTOR_OUT",
         ],
-        "End_Connection_1": [],
-        "End_Connection_2": [],
+        "End_Connector_1": [],
+        "End_Connector_2": [],
     }
 
     COMPONENT_TYPES = [
@@ -274,7 +281,8 @@ class WingMount(Component):
 
     def __init__(self, name: str,
                  chord: float,
-                 profile: str):
+                 profile: str,
+                 port_thickness: float):
         assert isinstance(profile, str) and len(profile) == 4
         super(WingMount, self).__init__(
             name=name,
@@ -282,24 +290,24 @@ class WingMount(Component):
             parameters={
                 "CHORD": chord,
                 "THICKNESS": int(profile[2:4]),
+                "PORT_THICKNESS": port_thickness,
                 "BOTTOM_CONNECTION_DISP": 0.0,
-                "PORT_THICKNESS": 100.0,
             })
 
 
 class Wing(Component):
     CONNECTORS = {
         "Connector_1": [
-            "NACA_Port_Connector.End_Connection_1",
-            "NACA_Port_Connector.End_Connection_2",  # upside down
-            "Fuselage.Left_Connector",
-            "Fuselage.Right_Connector",  # upside down
+            "NACA_Port_Connector.End_Connector_1",
+            "NACA_Port_Connector.End_Connector_2",  # upside down
+            "Fuselage.LEFT_CONNECTOR",
+            "Fuselage.RIGHT_CONNECTOR",  # upside down
         ],
         "Connector_2": [
-            "NACA_Port_Connector.End_Connection_1",  # upside down
-            "NACA_Port_Connector.End_Connection_2",
-            "Fuselage.Left_Connector",  # upside down
-            "Fuselage.Right_Connector",
+            "NACA_Port_Connector.End_Connector_1",  # upside down
+            "NACA_Port_Connector.End_Connector_2",
+            "Fuselage.LEFT_CONNECTOR",  # upside down
+            "Fuselage.RIGHT_CONNECTOR",
         ],
         "Battery_Connector_1": [],
         "Battery_Connector_2": [],
@@ -361,20 +369,20 @@ class Wing(Component):
 class Beam(Component):
     CONNECTORS = {
         "END_CONNECTOR_1": [
-            "Fuselage.Left_Connector",
-            "Fuselage.Right_Connector",
-            "Fuselage.Top_Connector",
-            "Fuselage.Bottom_Connector",
-            "Fuselage.Rear_Connector",
+            "Fuselage.LEFT_CONNECTOR",
+            "Fuselage.RIGHT_CONNECTOR",
+            "Fuselage.TOP_CONNECTOR",
+            "Fuselage.BOTTOM_CONNECTOR",
+            "Fuselage.REAR_CONNECTOR",
             "Beam.TOP_CONNECTOR_IN",
             "Beam.BOTTOM_CONNECTOR_OUT",
         ],
         "END_CONNECTOR_2": [
-            "Fuselage.Left_Connector",
-            "Fuselage.Right_Connector",
-            "Fuselage.Top_Connector",
-            "Fuselage.Bottom_Connector",
-            "Fuselage.Rear_Connector",
+            "Fuselage.LEFT_CONNECTOR",
+            "Fuselage.RIGHT_CONNECTOR",
+            "Fuselage.TOP_CONNECTOR",
+            "Fuselage.BOTTOM_CONNECTOR",
+            "Fuselage.REAR_CONNECTOR",
             "Beam.TOP_CONNECTOR_IN",
             "Beam.BOTTOM_CONNECTOR_OUT",
         ],
@@ -397,7 +405,11 @@ class Beam(Component):
 
 
 class Orient(Component):
-    CONNECTORS = {}
+    CONNECTORS = {
+        "ORIENTCONN": [
+            "Fuselage.ORIENT",
+        ]
+    }
 
     COMPONENT_TYPES = ["Orient"]
 
@@ -450,43 +462,87 @@ class Design():
         return valid
 
 
-design = Design("Nothing")
+# TROWEL
 
-design.add(Fuselage("fuselage", "FUSE_SPHERE_CYL_CONE"))
-design.add(BatteryController("power", voltage=5000))
+design = Design("Trowel")
 
-design.add(Passenger("Joe", "Passenger"))
-design.conn("Joe", "Connector", "fuselage", "Seat_1_Connector")
+design.add(Fuselage("fuselage", "FUSE_SPHERE_CYL_CONE",
+                    sphere_diameter=1520,
+                    length=2000,
+                    middle_length=300,
+                    floor_height=150,
+                    tail_diameter=200,
+                    seat_1_lr=210,
+                    seat_1_fb=790,
+                    seat_2_lr=-210,
+                    seat_2_fb=790,
+                    port_thickness=150))
 
-design.add(Passenger("Jane", "Passenger"))
-design.conn("Jane", "Connector", "fuselage", "Seat_2_Connector")
+design.add(Orient("Orient", z_angle=0))
+design.conn("Orient", "ORIENTCONN", "fuselage", "ORIENT")
 
-design.add(Motor("motor1", "Emrax268LV", control_channel=1))
-design.conn("motor1", "Base_Connector", "fuselage", "Rear_Connector")
-design.conn("motor1", "MotorPower", "power", "MotorPower")
+design.add(BatteryController("777V_Bat_System"))
 
-design.add(Propeller("prop1", "41x6_3_3400_51_530", prop_type=1, direction=1))
-design.conn("prop1", "MOTOR_CONNECTOR_CS_IN", "motor1", "Prop_Connector")
+design.add(Passenger("Passenger1", "Passenger"))
+design.conn("Passenger1", "Connector", "fuselage", "Seat_1_Connector")
 
-design.add(WingMount("mount1", chord=3000, profile="0012"))
-design.conn("mount1", "Bottom_connector", "fuselage", "Top_Connector")
+design.add(Passenger("Passenger2", "Passenger"))
+design.conn("Passenger2", "Connector", "fuselage", "Seat_1_Connector")
 
-design.add(Wing("left_wing", chord=3000, profile="0012", span=5000, load=1e11))
-design.conn("left_wing", "Connector_1", "mount1", "End_Connection_1")
+design.add(WingMount("top_naca_connector",
+                     chord=2000,
+                     profile="4512",
+                     port_thickness=150))
+design.conn("top_naca_connector", "BOTTOM_CONNECTOR",
+            "fuselage", "TOP_CONNECTOR")
 
-design.add(Battery("left_battery", "Tattu 25Ah Li", voltage_request=1000,
-                   mount_side=1, chord=3000, profile="0012", span=5000))
-design.conn("left_battery", "Battery_Connector_1_Out", "left_wing", "Battery_Connector_1")
-design.conn("left_battery", "PowerBus", "power", "BatteryPower")
+design.add(Wing("left_top_wing",
+                chord=2000,
+                profile="4512",
+                span=10000,
+                load=7000))
+design.conn("left_top_wing", "Connector_2",
+            "top_naca_connector", "End_Connector_2")
 
-design.add(Wing("right_wing", chord=3000, profile="0012", span=5000, load=1e11))
-design.conn("right_wing", "Connector_2", "mount1", "End_Connection_2")
+design.add(Wing("right_top_wing",
+                chord=2000,
+                profile="4512",
+                span=10000,
+                load=7000))
+design.conn("right_top_wing", "Connector_1",
+            "top_naca_connector", "End_Connector_1")
 
-design.add(Battery("right_battery", "Tattu 25Ah Li", voltage_request=1000,
-                   mount_side=2, chord=3000, profile="0012", span=5000))
-design.conn("right_battery", "Battery_Connector_2_Out", "right_wing", "Battery_Connector_2")
-design.conn("right_battery", "PowerBus", "power", "BatteryPower")
+design.add(WingMount("bot_naca_connector",
+                     chord=1000,
+                     profile="0025",
+                     port_thickness=150))
+design.conn("bot_naca_connector", "BOTTOM_CONNECTOR",
+            "fuselage", "BOTTOM_CONNECTOR")
 
-design.add(Orient("orient", z_angle=0))
+design.add(Wing("right_bot_wing",
+                chord=1000,
+                profile="0025",
+                span=4500,
+                load=2000))
+design.conn("right_bot_wing", "Connector_1",
+            "bot_naca_connector", "End_Connector_2")
+
+design.add(Wing("left_bot_wing",
+                chord=1000,
+                profile="0025",
+                span=4500,
+                load=2000))
+design.conn("left_bot_wing", "Connector_2",
+            "bot_naca_connector", "End_Connector_1")
+
+design.add(Battery("left_battery", "Tattu25AhLi",
+                   volume_percent=100,
+                   voltage_request=777,
+                   mount_side=2,
+                   chord=1000,
+                   profile="0025",
+                   span=4500))
+design.conn("left_battery", "Battery_Connector_2_out",
+            "left_bot_wing", "Battery_Connector_2")
 
 design.validate()
