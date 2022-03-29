@@ -253,6 +253,7 @@ def combination_generator(
 def datapoint_generator(
         fdm_binary: str,
         target_speed: float,
+        load_safety: float,
         combinations: Iterable[Dict[str, Any]]
 ) -> Generator[Dict[str, Any], None, None]:
     for comb in combinations:
@@ -267,7 +268,7 @@ def datapoint_generator(
         fdm_output = run_new_fdm(fdm_binary, fdm_input)
         lift_drags = parse_fdm_output(fdm_output, target_speed)
         for lift_drag in lift_drags:
-            if lift_drag["flight_load"] < comb["max_load"]:
+            if lift_drag["flight_load"] * load_safety < comb["max_load"]:
                 yield {**comb, **lift_drag, **geom_data, **weight_data}
 
 
@@ -282,7 +283,7 @@ def run(args=None):
     parser.add_argument('--fdm',
                         default='new_fdm', metavar='PATH',
                         help="path to the new_fdm executable")
-    parser.add_argument('--speed', type=float, default=50.0,
+    parser.add_argument('--speed', type=float, default=40.0,
                         help='change the target speed')
     parser.add_argument('--naca', metavar='DDDD',
                         help='limits the search to this NACA number')
@@ -292,6 +293,8 @@ def run(args=None):
                         help='limits the search to this span number')
     parser.add_argument('--max-load', type=float,
                         help='limits the search to this max load number')
+    parser.add_argument('--load-safety', type=float, default=1.25,
+                        help='safety factor for maximum vs flight loads')
     parser.add_argument('--info', action='store_true',
                         help="print out all search ranges")
     args = parser.parse_args(args)
@@ -317,7 +320,7 @@ def run(args=None):
     else:
         max_loads = range(2000, 11000, 1000)
 
-    total = len(profiles) * len(chords) * len(spans) * len(max_loads) * 21
+    total = len(profiles) * len(chords) * len(spans) * len(max_loads) * 41
     if args.info:
         print("profiles:", ", ".join(profiles))
         print("chords:", ", ".join(map(str, chords)))
@@ -328,7 +331,11 @@ def run(args=None):
         return
 
     combinations = combination_generator(profiles, chords, spans, max_loads)
-    datapoints = datapoint_generator(args.fdm, args.speed, combinations)
+    datapoints = datapoint_generator(
+        fdm_binary=args.fdm,
+        target_speed=args.speed,
+        load_safety=args.load_safety,
+        combinations=combinations)
 
     with open(args.output, 'w', newline='') as file:
         row = next(datapoints)

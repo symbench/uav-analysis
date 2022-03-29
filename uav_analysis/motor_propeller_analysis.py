@@ -21,7 +21,7 @@ import math
 import os
 import sys
 
-from .components import DATAPATH, MOTORS, PROPELLERS, motor_propeller_generator
+from .components import DATAPATH, MOTORS, PROPELLERS, get_bemp_data
 
 
 def generate_fdm_input(
@@ -101,7 +101,9 @@ def parse_fdm_output(fdm_output: str) -> Optional[Dict[str, float]]:
     try:
         result = dict()
         for line in fdm_output.splitlines():
-            if line.startswith(" Max Volt  1"):
+            if line.startswith("     Motor #"):
+                assert line[129:142] == "r     Max Cur"
+            elif line.startswith(" Max Volt  1"):
                 linetype = "MaxVolt."
             elif line.startswith(" Max Power 1"):
                 linetype = "MaxPower."
@@ -110,14 +112,14 @@ def parse_fdm_output(fdm_output: str) -> Optional[Dict[str, float]]:
             else:
                 continue
 
-            result[linetype + "OmegaRpm"] = parse(line[22:32])
-            result[linetype + "Voltage"] = parse(line[32:42])
-            result[linetype + "Thrust"] = parse(line[42:52])
-            result[linetype + "Torque"] = parse(line[52:62])
-            result[linetype + "Power"] = parse(line[62:72])
-            result[linetype + "Current"] = parse(line[72:82])
-            result[linetype + "MaxPower"] = parse(line[92:102])
-            result[linetype + "MaxCurrent"] = parse(line[102:112])
+            result[linetype + "OmegaRpm"] = parse(line[25:38])
+            result[linetype + "Voltage"] = parse(line[38:51])
+            result[linetype + "Thrust"] = parse(line[51:64])
+            result[linetype + "Torque"] = parse(line[64:77])
+            result[linetype + "Power"] = parse(line[77:90])
+            result[linetype + "Current"] = parse(line[90:103])
+            result[linetype + "MaxPower"] = parse(line[116:129])
+            result[linetype + "MaxCurrent"] = parse(line[129:142])
 
         return result
 
@@ -132,6 +134,7 @@ def create_datapoint(combination: Dict[str, Any],
     result["propeller_name"] = combination["Propeller.Name"]
     result['weight'] = (float(combination['Motor.Weight [grams]']) +
                         float(combination['Propeller.Weight_g'])) * 0.001
+    result['propeller_diameter'] = combination["Propeller.Diameter_mm"] * 0.001
 
     # result.update(output_data)
 
@@ -157,6 +160,19 @@ def create_datapoint(combination: Dict[str, Any],
     return result
 
 
+def motor_propeller_generator(select_motor: Optional[str], select_propeller: Optional[str]):
+    for motor in MOTORS:
+        if select_motor and motor != select_motor:
+            continue
+        for propeller in PROPELLERS:
+            if select_propeller and propeller != select_propeller:
+                continue
+            if MOTORS[motor]['(A) Shaft Diameter [mm]'] > PROPELLERS[propeller]['Shaft_Diameter_mm']:
+                continue
+
+            yield get_bemp_data(None, motor, propeller)
+
+
 def datapoint_generator(
     propeller: Optional[str],
     motor: Optional[str],
@@ -164,15 +180,11 @@ def datapoint_generator(
     fdm_binary: str,
     propdata: str,
 ):
-    generator = motor_propeller_generator()
+    generator = motor_propeller_generator(
+        select_propeller=propeller, select_motor=motor)
     voltages = sorted(voltages)
 
     for bemp_comb in generator:
-        if propeller and propeller != bemp_comb["Propeller.Name"]:
-            continue
-        if motor and motor != bemp_comb["Motor.Name"]:
-            continue
-
         max_voltage = None
         for voltage in voltages:
             if max_voltage is not None and voltage < max_voltage * 0.25:
@@ -223,9 +235,10 @@ def run(args=None):
     parser.add_argument('--motor', metavar='NAME',
                         help='limits the search space to this motor')
     parser.add_argument('--voltage', metavar='V', nargs="*", default=[
-        0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0,
-        50.0, 100.0, 150.0, 200.0, 250.0, 300.0, 350.0, 400.0, 450.0, 500.0,
-        550.0, 600.0, 650.0, 700.0, 750.0, 800.0, 850.0, 900.0, 950.0, 1000.0],
+        200.0, 300.0, 400.0, 500.0, 600.0,
+        700.0, 720.0, 740.0, 760.0, 780.0,
+        800.0, 820.0, 840.0, 860.0, 880.0,
+    ],
         help='limits the search space to these voltages')
 
     args = parser.parse_args(args)

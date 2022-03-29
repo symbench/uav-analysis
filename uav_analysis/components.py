@@ -56,22 +56,3 @@ def get_bemp_data(battery: str, motor: str, propeller: str) -> Dict[str, float]:
     for key, val in PROPELLERS[propeller].items():
         data['Propeller.' + key] = val
     return data
-
-
-def battery_motor_propeller_generator():
-    for battery in BATTERIES:
-        for motor in MOTORS:
-            for propeller in PROPELLERS:
-                if MOTORS[motor]['(A) Shaft Diameter [mm]'] > PROPELLERS[propeller]['Shaft_Diameter_mm']:
-                    continue
-
-                yield get_bemp_data(battery, motor, propeller)
-
-
-def motor_propeller_generator():
-    for motor in MOTORS:
-        for propeller in PROPELLERS:
-            if MOTORS[motor]['(A) Shaft Diameter [mm]'] > PROPELLERS[propeller]['Shaft_Diameter_mm']:
-                continue
-
-            yield get_bemp_data(None, motor, propeller)
