@@ -93,18 +93,16 @@ def run_new_fdm(fdm_binary: str, fdm_input: str) -> str:
 
 
 def parse_fdm_output(fdm_output: str) -> Optional[Dict[str, float]]:
-    def parse(chars: str) -> float:
-        value = float(chars)
-        assert math.isfinite(value)
-        return value
-
     try:
         result = dict()
         for line in fdm_output.splitlines():
             if line.startswith("     Motor #"):
                 assert line[129:142] == "r     Max Cur"
+                continue
             elif line.startswith(" Max Volt  1"):
                 linetype = "MaxVolt."
+            elif line.startswith(" MV @40m/s 1"):
+                linetype = "MaxVolt_at40."
             elif line.startswith(" Max Power 1"):
                 linetype = "MaxPower."
             elif line.startswith(" Max Amps  1"):
@@ -112,18 +110,19 @@ def parse_fdm_output(fdm_output: str) -> Optional[Dict[str, float]]:
             else:
                 continue
 
-            result[linetype + "OmegaRpm"] = parse(line[25:38])
-            result[linetype + "Voltage"] = parse(line[38:51])
-            result[linetype + "Thrust"] = parse(line[51:64])
-            result[linetype + "Torque"] = parse(line[64:77])
-            result[linetype + "Power"] = parse(line[77:90])
-            result[linetype + "Current"] = parse(line[90:103])
-            result[linetype + "MaxPower"] = parse(line[116:129])
-            result[linetype + "MaxCurrent"] = parse(line[129:142])
+            result[linetype + "OmegaRpm"] = float(line[25:38])
+            result[linetype + "Voltage"] = float(line[38:51])
+            result[linetype + "Thrust"] = float(line[51:64])
+            result[linetype + "Torque"] = float(line[64:77])
+            result[linetype + "Power"] = float(line[77:90])
+            result[linetype + "Current"] = float(line[90:103])
+            result[linetype + "MaxPower"] = float(line[116:129])
+            result[linetype + "MaxCurrent"] = float(line[129:142])
 
         return result
 
-    except:
+    except ValueError as err:
+        print("WARNING:", err)
         return None
 
 
@@ -134,7 +133,7 @@ def create_datapoint(combination: Dict[str, Any],
     result["propeller_name"] = combination["Propeller.Name"]
     result['weight'] = (float(combination['Motor.Weight [grams]']) +
                         float(combination['Propeller.Weight_g'])) * 0.001
-    result['propeller_diameter'] = combination["Propeller.Diameter_mm"] * 0.001
+    result['propeller_diameter'] = float(combination["Propeller.Diameter_mm"]) * 0.001
 
     # result.update(output_data)
 
@@ -142,6 +141,10 @@ def create_datapoint(combination: Dict[str, Any],
     result["thrust"] = output_data["MaxVolt.Thrust"]
     result["power"] = output_data["MaxVolt.Power"]
     result["current"] = output_data["MaxVolt.Current"]
+
+    result["thrust_at40"] = output_data["MaxVolt_at40.Thrust"]
+    result["power_at40"] = output_data["MaxVolt_at40.Power"]
+    result["current_at40"] = output_data["MaxVolt_at40.Current"]
 
     if output_data['MaxPower.Power'] < output_data['MaxAmps.Power']:
         result["max_voltage"] = output_data["MaxPower.Voltage"]
@@ -156,6 +159,7 @@ def create_datapoint(combination: Dict[str, Any],
 
     result["thrust_per_weight"] = result["thrust"] / result["weight"]
     result["power_per_weight"] = result["power"] / result["weight"]
+    result["thrust_per_power"] = result["thrust"] / result["power"]
 
     return result
 
