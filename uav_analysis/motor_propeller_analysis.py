@@ -14,11 +14,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Generator
 
+import concurrent.futures
 import csv
 import math
 import os
+import subprocess
 import sys
 
 from .components import DATAPATH, MOTORS, PROPELLERS, get_bemp_data
@@ -79,17 +81,11 @@ def generate_fdm_input(
 
 
 def run_new_fdm(fdm_binary: str, fdm_input: str) -> str:
-    with open('motor_propeller_analysis.inp', 'w') as file:
-        file.write(fdm_input)
-
-    cmd = "{} < motor_propeller_analysis.inp > motor_propeller_analysis.out".format(
-        fdm_binary)
-    status = os.system(cmd)
-    if status == 2:
+    proc = subprocess.Popen(fdm_binary, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    fdm_output, _ = proc.communicate(input=fdm_input.encode())
+    if proc.returncode != 0:
         raise KeyboardInterrupt
-
-    with open('motor_propeller_analysis.out', 'r') as file:
-        return file.read()
+    return fdm_output.decode()
 
 
 def parse_fdm_output(fdm_output: str) -> Optional[Dict[str, float]]:
@@ -170,7 +166,46 @@ def create_datapoint(combination: Dict[str, Any],
     return result
 
 
-def motor_propeller_generator(select_motor: Optional[str], select_propeller: Optional[str]):
+def motor_prop_datapoints(
+        voltages: List[float],
+        fdm_binary: str,
+        propdata: str,
+        motor_prop: Dict[str, Any]) -> List[Dict[str, Any]]:
+    result = []
+    max_voltage = None
+    for voltage in voltages:
+        if max_voltage is not None and voltage < max_voltage * 0.25:
+            continue
+
+        fdm_input = generate_fdm_input(
+            bemp_comb=motor_prop,
+            voltage=voltage,
+            propdata=propdata)
+        fdm_output = run_new_fdm(
+            fdm_binary=fdm_binary,
+            fdm_input=fdm_input)
+        output_data = parse_fdm_output(
+            fdm_output=fdm_output)
+
+        if output_data is None:
+            continue
+
+        max_voltage = min(
+            output_data["MaxPower.Voltage"], output_data["MaxAmps.Voltage"])
+
+        if output_data["MaxVolt.OmegaRpm"] < 0.0:
+            continue
+
+        if output_data["MaxVolt.Voltage"] > max_voltage:
+            break
+
+        result.append(create_datapoint(motor_prop, output_data))
+    return result
+
+
+def motor_propeller_generator(select_motor: Optional[str],
+                              select_propeller: Optional[str]) \
+        -> Generator[Dict[str, Any], None, None]:
     for motor in MOTORS:
         if select_motor and motor != select_motor:
             continue
@@ -183,46 +218,42 @@ def motor_propeller_generator(select_motor: Optional[str], select_propeller: Opt
             yield get_bemp_data(None, motor, propeller)
 
 
-def datapoint_generator(
-    propeller: Optional[str],
-    motor: Optional[str],
-    voltages: List[float],
-    fdm_binary: str,
-    propdata: str,
+def save_all_datapoints(
+        iterable: Iterable[Dict[str, Any]],
+        voltages: List[float],
+        fdm_binary: str,
+        propdata: str,
+        output: str,
 ):
-    generator = motor_propeller_generator(
-        select_propeller=propeller, select_motor=motor)
     voltages = sorted(voltages)
 
-    for bemp_comb in generator:
-        max_voltage = None
-        for voltage in voltages:
-            if max_voltage is not None and voltage < max_voltage * 0.25:
-                continue
+    def task(motor_prop: Dict[str, float]):
+        # print(motor_prop)
+        return motor_prop_datapoints(
+            voltages=voltages,
+            fdm_binary=fdm_binary,
+            propdata=propdata,
+            motor_prop=motor_prop)
 
-            fdm_input = generate_fdm_input(
-                bemp_comb=bemp_comb,
-                voltage=voltage,
-                propdata=propdata)
-            fdm_output = run_new_fdm(
-                fdm_binary=fdm_binary,
-                fdm_input=fdm_input)
-            output_data = parse_fdm_output(
-                fdm_output=fdm_output)
+    print("Generating datapoints:")
+    with open(output, 'w', newline='') as file:
+        writer = None
+        count = 0
 
-            if output_data is None:
-                continue
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            iterable = executor.map(task, iterable, chunksize=10)
+            for rows in iterable:
+                for row in rows:
+                    if writer is None:
+                        writer = csv.DictWriter(file, row.keys())
+                        writer.writeheader()
+                    writer.writerow(row)
+                    if count % 100 == 0:
+                        sys.stdout.write("\r{}".format(count))
+                        sys.stdout.flush()
+                    count += 1
 
-            max_voltage = min(
-                output_data["MaxPower.Voltage"], output_data["MaxAmps.Voltage"])
-
-            if output_data["MaxVolt.OmegaRpm"] < 0.0:
-                continue
-
-            if output_data["MaxVolt.Voltage"] > max_voltage:
-                break
-
-            yield create_datapoint(bemp_comb, output_data)
+    print("\nResults saved to", output)
 
 
 def run(args=None):
@@ -236,8 +267,6 @@ def run(args=None):
                         metavar='DIR', help="path to propeller data directory")
     parser.add_argument('--output', default='motor_propeller_analysis.csv',
                         metavar='FILENAME', help="output file name")
-    parser.add_argument('--limit', type=int, metavar='NUM',
-                        help="process only LIMIT number of combinations")
     parser.add_argument('--fdm', default='new_fdm', metavar='PATH',
                         help="path to fdm executable")
     parser.add_argument('--propeller', metavar='NAME',
@@ -255,32 +284,14 @@ def run(args=None):
 
     args = parser.parse_args(args)
 
-    datapoints = datapoint_generator(
-        propeller=args.propeller,
-        motor=args.motor,
+    save_all_datapoints(
+        iterable=motor_propeller_generator(
+            select_propeller=args.propeller,
+            select_motor=args.motor),
         voltages=args.voltage,
         fdm_binary=args.fdm,
-        propdata=args.propdata)
-
-    total = len(MOTORS) * len(PROPELLERS) * len(args.voltage)
-    print("Progress: ")
-
-    with open(args.output, 'w', newline='') as file:
-        row = next(datapoints)
-        writer = csv.DictWriter(file, row.keys())
-        writer.writeheader()
-        writer.writerow(row)
-        cnt = 0
-        for row in datapoints:
-            writer.writerow(row)
-            if cnt % 100 == 0:
-                sys.stdout.write("\r{:6.2f}%".format(100 * cnt / total))
-                sys.stdout.flush()
-            cnt += 1
-            if args.limit and cnt >= args.limit:
-                break
-
-        print("\nResults saved to", args.output)
+        propdata=args.propdata,
+        output=args.output)
 
 
 if __name__ == '__main__':
