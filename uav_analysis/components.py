@@ -14,9 +14,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Dict, Any
+from gettext import find
+from typing import Dict, Any, Tuple
 
 import csv
+import math
 import os
 
 DATAPATH = os.path.join(os.path.abspath(os.path.dirname(__file__)),
@@ -36,14 +38,43 @@ def load_static_data(name: str) -> Dict[str, Dict[str, Any]]:
 
 
 BATTERIES = load_static_data('Battery')
-PROPELLERS = load_static_data('Propeller')
+PROPELLERS = load_static_data('PropellerExt')
 WINGS = load_static_data('Wing')
 MOTORS = load_static_data('Motor')
 
-BATTERY_NAMES = sorted(BATTERIES.keys())
-PROPELLER_NAMES = sorted(BATTERIES.keys())
-WING_NAMES = sorted(WINGS.keys())
-MOTOR_NAMES = sorted(MOTORS.keys())
+
+def find_rpm_minmax(propname: str) -> Tuple[float, float]:
+    filename = os.path.join(DATAPATH, "propeller", propname + ".dat")
+    rpm_min = 1e10
+    rpm_max = -1e10
+    with open(filename, 'r') as file:
+        for line in file.readlines():
+            line = line.strip()
+            if line.startswith("PROP RPM = "):
+                rpm = rpm = float(line.split()[3])
+                if math.isfinite(rpm):
+                    rpm_min = min(rpm_min, rpm)
+                    rpm_max = max(rpm_max, rpm)
+    assert rpm_min != 1e10
+    return (rpm_min, rpm_max)
+
+
+def create_extended_propeller_table():
+    import csv
+
+    filename = os.path.join(DATAPATH, "PropellerExt.csv")
+    with open(filename, "w") as file:
+        writer = None
+
+        for prop, data in PROPELLERS.items():
+            rpm_min, rpm_max = find_rpm_minmax(prop)
+            data["RPM Min"] = rpm_min
+            data["RPM Max"] = rpm_max
+
+            if writer is None:
+                writer = csv.DictWriter(file, fieldnames=data.keys())
+                writer.writeheader()
+            writer.writerow(data)
 
 
 def get_bemp_data(battery: str, motor: str, propeller: str) -> Dict[str, float]:
@@ -56,3 +87,7 @@ def get_bemp_data(battery: str, motor: str, propeller: str) -> Dict[str, float]:
     for key, val in PROPELLERS[propeller].items():
         data['Propeller.' + key] = val
     return data
+
+
+if __name__ == '__main__':
+    create_extended_propeller_table()
