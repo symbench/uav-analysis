@@ -93,6 +93,12 @@ def run_new_fdm(fdm_binary: str, fdm_input: str) -> str:
 
 
 def parse_fdm_output(fdm_output: str) -> Optional[Dict[str, float]]:
+    def parse(value: str) -> float:
+        value = float(value)
+        if not math.isfinite(value):
+            raise ValueError(str(value) + " is not finite")
+        return value
+
     try:
         result = dict()
         for line in fdm_output.splitlines():
@@ -110,19 +116,19 @@ def parse_fdm_output(fdm_output: str) -> Optional[Dict[str, float]]:
             else:
                 continue
 
-            result[linetype + "OmegaRpm"] = float(line[25:38])
-            result[linetype + "Voltage"] = float(line[38:51])
-            result[linetype + "Thrust"] = float(line[51:64])
-            result[linetype + "Torque"] = float(line[64:77])
-            result[linetype + "Power"] = float(line[77:90])
-            result[linetype + "Current"] = float(line[90:103])
-            result[linetype + "MaxPower"] = float(line[116:129])
-            result[linetype + "MaxCurrent"] = float(line[129:142])
+            result[linetype + "OmegaRpm"] = parse(line[25:38])
+            result[linetype + "Voltage"] = parse(line[38:51])
+            result[linetype + "Thrust"] = parse(line[51:64])
+            result[linetype + "Torque"] = parse(line[64:77])
+            result[linetype + "Power"] = parse(line[77:90])
+            result[linetype + "Current"] = parse(line[90:103])
+            result[linetype + "MaxPower"] = parse(line[116:129])
+            result[linetype + "MaxCurrent"] = parse(line[129:142])
 
         return result
 
     except ValueError as err:
-        print("WARNING:", err)
+        # print("WARNING:", err)
         return None
 
 
@@ -239,9 +245,11 @@ def run(args=None):
     parser.add_argument('--motor', metavar='NAME',
                         help='limits the search space to this motor')
     parser.add_argument('--voltage', metavar='V', nargs="*", default=[
-        200.0, 300.0, 400.0, 500.0, 600.0,
-        700.0, 720.0, 740.0, 760.0, 780.0,
-        800.0, 820.0, 840.0, 860.0, 880.0,
+        0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0,
+        10.0, 12.5, 15.0, 17.5, 20.0, 25.0, 30.0, 40.0, 50.0, 80.0,
+        100.0, 150.0, 200.0, 250.0, 300.0, 350.0, 400.0, 450.0,
+        500.0, 550.0, 600.0, 650.0, 700.0, 750.0, 800.0, 850.0, 900.0,
+        1000.0, 1100.0, 1200.0, 1300.0, 1400.0, 1500.0
     ],
         help='limits the search space to these voltages')
 
