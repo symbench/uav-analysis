@@ -37,6 +37,7 @@ def run():
         "bemp-combinations-hackathon1",
         "bemp-fdm-generator-hackathon1",
         "motor-propeller-analysis",
+        "motor-propeller-single",
         "battery-analysis",
         "wing-analysis",
         "aggregate-analysis",
@@ -58,6 +59,8 @@ def run():
         bemp_fdm_generator_hackathon1.run(args=sys.argv[2:])
     elif args.command == 'motor-propeller-analysis':
         motor_propeller_analysis.run(args=sys.argv[2:])
+    elif args.command == 'motor-propeller-single':
+        motor_propeller_analysis.run_single(args=sys.argv[2:])
     elif args.command == 'battery-analysis':
         battery_analysis.run(args=sys.argv[2:])
     elif args.command == 'wing-analysis':

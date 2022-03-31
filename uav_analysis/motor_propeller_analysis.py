@@ -27,7 +27,7 @@ from .components import DATAPATH, MOTORS, PROPELLERS, get_bemp_data
 
 
 def generate_fdm_input(
-        bemp_comb: Dict[str, Any],
+        motor_prop: Dict[str, Any],
         voltage: float,
         propdata: str) -> str:
     template = """&aircraft_data
@@ -65,23 +65,24 @@ def generate_fdm_input(
 /
 """
     return template.format(
-        prop_cname=bemp_comb["Propeller.Name"],
+        prop_cname=motor_prop["Propeller.Name"],
         prop_fname=os.path.join(
-            propdata, bemp_comb["Propeller.Performance_File"]),
-        prop_radius=float(bemp_comb["Propeller.Diameter_mm"]) * 0.5,
-        motor_fname=bemp_comb["Motor.Name"],
-        motor_kv=float(bemp_comb["Motor.KV [RPM/V]"]),
-        motor_kt=float(bemp_comb["Motor.KT [Nm/A]"]),
-        motor_i_max=float(bemp_comb["Motor.Max Current [A]"]),
-        motor_i_idle=float(bemp_comb["Motor.Io Idle Current@10V [A]"]),
-        motor_max_power=float(bemp_comb["Motor.Max Power [W]"]),
-        motor_rw=float(bemp_comb["Motor.Internal Resistance [mOhm]"]) * 0.001,
+            propdata, motor_prop["Propeller.Performance_File"]),
+        prop_radius=float(motor_prop["Propeller.Diameter_mm"]) * 0.5,
+        motor_fname=motor_prop["Motor.Name"],
+        motor_kv=float(motor_prop["Motor.KV [RPM/V]"]),
+        motor_kt=float(motor_prop["Motor.KT [Nm/A]"]),
+        motor_i_max=float(motor_prop["Motor.Max Current [A]"]),
+        motor_i_idle=float(motor_prop["Motor.Io Idle Current@10V [A]"]),
+        motor_max_power=float(motor_prop["Motor.Max Power [W]"]),
+        motor_rw=float(motor_prop["Motor.Internal Resistance [mOhm]"]) * 0.001,
         voltage=voltage,
     )
 
 
 def run_new_fdm(fdm_binary: str, fdm_input: str) -> str:
-    proc = subprocess.Popen(fdm_binary, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    proc = subprocess.Popen(
+        fdm_binary, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     fdm_output, _ = proc.communicate(input=fdm_input.encode())
     if proc.returncode != 0:
         raise KeyboardInterrupt
@@ -103,8 +104,8 @@ def parse_fdm_output(fdm_output: str) -> Optional[Dict[str, float]]:
                 continue
             elif line.startswith(" Max Volt  1"):
                 linetype = "MaxVolt."
-            elif line.startswith(" MV @40m/s 1"):
-                linetype = "MaxVolt_at40."
+            # elif line.startswith(" MV @40m/s 1"):
+            #     linetype = "MaxVolt_at40."
             elif line.startswith(" Max Power 1"):
                 linetype = "MaxPower."
             elif line.startswith(" Max Amps  1"):
@@ -135,27 +136,34 @@ def create_datapoint(combination: Dict[str, Any],
     result["propeller_name"] = combination["Propeller.Name"]
     result['weight'] = (float(combination['Motor.Weight [grams]']) +
                         float(combination['Propeller.Weight_g'])) * 0.001
-    result['propeller_diameter'] = float(combination["Propeller.Diameter_mm"]) * 0.001
+    result['propeller_diameter'] = float(
+        combination["Propeller.Diameter_mm"]) * 0.001
 
     # result.update(output_data)
 
+    result["omega_rpm"] = output_data["MaxVolt.OmegaRpm"]
     result["voltage"] = output_data["MaxVolt.Voltage"]
     result["thrust"] = output_data["MaxVolt.Thrust"]
+    result["torque"] = output_data["MaxVolt.Torque"]
     result["power"] = output_data["MaxVolt.Power"]
     result["current"] = output_data["MaxVolt.Current"]
 
-    result["thrust_at40"] = output_data["MaxVolt_at40.Thrust"]
-    result["power_at40"] = output_data["MaxVolt_at40.Power"]
-    result["current_at40"] = output_data["MaxVolt_at40.Current"]
+    # result["thrust_at40"] = output_data["MaxVolt_at40.Thrust"]
+    # result["power_at40"] = output_data["MaxVolt_at40.Power"]
+    # result["current_at40"] = output_data["MaxVolt_at40.Current"]
 
     if output_data['MaxPower.Power'] < output_data['MaxAmps.Power']:
+        result["max_omega_rpm"] = output_data["MaxPower.OmegaRpm"]
         result["max_voltage"] = output_data["MaxPower.Voltage"]
         result["max_thrust"] = output_data["MaxPower.Thrust"]
+        result["max_torque"] = output_data["MaxPower.Torque"]
         result["max_power"] = output_data["MaxPower.Power"]
         result["max_current"] = output_data["MaxPower.Current"]
     else:
+        result["max_omega_rpm"] = output_data["MaxAmps.OmegaRpm"]
         result["max_voltage"] = output_data["MaxAmps.Voltage"]
         result["max_thrust"] = output_data["MaxAmps.Thrust"]
+        result["max_torque"] = output_data["MaxAmps.Torque"]
         result["max_power"] = output_data["MaxAmps.Power"]
         result["max_current"] = output_data["MaxAmps.Current"]
 
@@ -178,7 +186,7 @@ def motor_prop_datapoints(
             continue
 
         fdm_input = generate_fdm_input(
-            bemp_comb=motor_prop,
+            motor_prop=motor_prop,
             voltage=voltage,
             propdata=propdata)
         fdm_output = run_new_fdm(
@@ -192,8 +200,10 @@ def motor_prop_datapoints(
 
         max_voltage = min(
             output_data["MaxPower.Voltage"], output_data["MaxAmps.Voltage"])
+        if voltage < max_voltage * 0.25:
+            continue
 
-        if output_data["MaxVolt.OmegaRpm"] < 0.0:
+        if output_data["MaxVolt.OmegaRpm"] < 0.0 or output_data["MaxVolt.Torque"] < 0.0:
             continue
 
         if output_data["MaxVolt.Voltage"] > max_voltage:
@@ -255,6 +265,39 @@ def save_all_datapoints(
 
     print("\nResults saved to", output)
 
+
+def run_single(args=None):
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--propdata',
+                        default=os.path.relpath(
+                            os.path.join(DATAPATH, 'propeller')),
+                        metavar='DIR', help="path to propeller data directory")
+    parser.add_argument('--fdm', default='new_fdm', metavar='PATH',
+                        help="path to fdm executable")
+    parser.add_argument('motor', metavar='MOTOR', help='motor name')
+    parser.add_argument('propeller', metavar='PROPELLER',
+                        help='propeller name')
+    parser.add_argument('voltage', metavar='VOLTAGE',
+                        type=float, help='voltage level')
+
+    args = parser.parse_args(args)
+
+    motor_prop = get_bemp_data(None, args.motor, args.propeller)
+
+    fdm_input = generate_fdm_input(motor_prop, args.voltage, args.propdata)
+    with open("motor_propeller_single.inp", 'w') as file:
+        file.write(fdm_input)
+
+    fdm_output = run_new_fdm(
+        fdm_binary=args.fdm,
+        fdm_input=fdm_input)
+    with open("motor_propeller_single.out", 'w') as file:
+        file.write(fdm_output)
+
+    print(fdm_output)
 
 def run(args=None):
     import argparse
