@@ -47,14 +47,14 @@ def evaluate(expr: sympy.Expr, input_data: Dict[str, numpy.ndarray]) -> numpy.nd
     if (isinstance(expr, float) or isinstance(expr, int)
             or expr.func == sympy.Float
             or expr.func == sympy.Integer
-            or expr.func == sympy.numbers.Rational
-            or expr.func == sympy.numbers.NegativeOne
-            or expr.func == sympy.numbers.Zero
-            or expr.func == sympy.numbers.One
-            or expr.func == sympy.numbers.Pi
-            or expr.func == sympy.numbers.Half):
+            or expr.func == sympy.core.numbers.Rational
+            or expr.func == sympy.core.numbers.NegativeOne
+            or expr.func == sympy.core.numbers.Zero
+            or expr.func == sympy.core.numbers.One
+            or expr.func == sympy.core.numbers.Pi
+            or expr.func == sympy.core.numbers.Half):
         return numpy.full((), float(expr))
-    elif isinstance(expr, sympy.numbers.NaN):
+    elif isinstance(expr, sympy.core.numbers.NaN):
         raise ValueError("NaN value encountered, maybe from dividing by zero")
     elif expr.func == sympy.Symbol:
         return input_data[expr.name]
@@ -111,7 +111,12 @@ def approximate(func: sympy.Expr, input_data: Dict[str, numpy.ndarray],
             diffs = [evaluate(diff.subs(subs), input_data)
                      for diff in self.diffs]
             diffs = [numpy.broadcast_to(diff, shape) for diff in diffs]
-            return numpy.array(diffs).transpose()
+            jac = numpy.array(diffs).transpose()
+            #print(f"{numpy.array(diffs).transpose().shape}")
+            if jac.shape[0] == 1: #  (1, *, *) --> (*, *)
+                jac = numpy.squeeze(jac, axis=0)
+                assert len(jac.shape) == 2
+            return jac
 
     init = [0.0] * len(param_vars)
     result = optimize.least_squares(
