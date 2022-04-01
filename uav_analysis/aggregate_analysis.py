@@ -21,6 +21,8 @@ import math
 import os
 import sys
 
+from .components import MOTORS, PROPELLERS
+
 DATAPATH = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                         'data_hackathon2_uam')
 
@@ -104,13 +106,13 @@ def wing_generator() -> Generator[Dict[str, Any], None, None]:
     for data in csv_generator("wing_analysis_pareto.csv"):
         assert float(data["speed"]) == 50.0
         yield {
-            "weight": float(data["weight"]),      # kg
-            "lift_50mps": float(data["lift"]),    # N
-            "drag_50mps": float(data["drag"]),    # N
-            "available_volume": float(data["available_volume"]),  # m^3
+            "weight": float(data["weight"]),       # kg
+            "lift_50mps": float(data["lift"]),     # N
+            "drag_50mps": float(data["drag"]),     # N
+            "available_volume": float(data["available_volume"]) * 1e-9,  # m^3
             "profile_name": data["profile"],
-            "chord": float(data["chord"]),
-            "span": float(data["span"]),
+            "chord": float(data["chord"]) * 1e-3,  # m
+            "span": float(data["span"]) * 1e-3,    # m
         }
 
 
@@ -190,6 +192,57 @@ def battery_double_motor_propeller_generator(
                 })
 
 
+def wing_battery_num_motors_generator(
+        battery_bug: True,
+        min_forward: int = 10, max_forward: int = 20,
+        min_lifting: int = 10, max_lifting: int = 20):
+    import json
+
+    # TODO: this is not a good approach probably, will do it with constraint solver
+
+    # hand picked
+    motor_prop = {
+        "motor_name": "KDE13218XF-105",
+        "propeller_name": "34x3_2_4600_41_250",
+        "weight": 2.313,
+        "propeller_diameter": 0.8636,
+        "voltage": 25.0,
+        "thrust": 106.04,
+        "power": 1743.54,
+        "current": 69.74,
+        "max_voltage": 38.29,
+    }
+
+    num_wings = 2
+
+    for batt in battery_generator(battery_bug=battery_bug):
+        series_count = int(math.ceil(
+            motor_prop["voltage"] / batt["voltage"]))
+
+        pack_voltage = batt["voltage"] * series_count
+        if pack_voltage > motor_prop["max_voltage"]:
+            continue
+
+        min_parallel_count = int(math.ceil(
+            motor_prop["current"] / batt["current"]))
+
+        for wing in wing_generator():
+            wing_weight = wing["weight"] * num_wings
+
+            max_parallal_count = int(math.floor(
+                (num_wings * wing["available_volume"]) /
+                (batt["volume"] * series_count)))
+
+            if max_parallal_count < min_parallel_count:
+                continue
+
+            print(json.dumps({
+                "motor_prop": motor_prop,
+                "battery": batt,
+                "wing": wing,
+            }, indent=2))
+
+
 def save_to_csv(generator: Generator[Dict[str, Any], None, None],
                 filename: str):
     count = 0
@@ -228,6 +281,7 @@ def run(args=None):
                         help='sets the discharge rate to 25C')
     parser.add_argument('generator', choices=[
         "double-motor-propeller",
+        "wing-battery-num-motors",
     ])
 
     args = parser.parse_args(args)
@@ -239,10 +293,17 @@ def run(args=None):
             min_seconds=args.seconds,
             max_weight=args.max_weight,
             battery_bug=args.battery_bug)
+    elif args.generator == "wing-battery-num-motors":
+        generator = wing_battery_num_motors_generator(
+            battery_bug=args.battery_bug,
+            min_forward=args.forward,
+            max_forward=args.forward,
+            min_lifting=args.lifting,
+            max_lifting=args.lifting)
     else:
         raise ValueError("unknown generator")
 
-    save_to_csv(generator, args.output)
+    # save_to_csv(generator, args.output)
 
 
 if __name__ == '__main__':

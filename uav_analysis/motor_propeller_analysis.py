@@ -129,15 +129,17 @@ def parse_fdm_output(fdm_output: str) -> Optional[Dict[str, float]]:
         return None
 
 
-def create_datapoint(combination: Dict[str, Any],
+def create_datapoint(motor_prop: Dict[str, Any],
                      output_data: Dict[str, Any]) -> Dict[str, Any]:
     result = dict()
-    result["motor_name"] = combination["Motor.Name"]
-    result["propeller_name"] = combination["Propeller.Name"]
-    result['weight'] = (float(combination['Motor.Weight [grams]']) +
-                        float(combination['Propeller.Weight_g'])) * 0.001
+    result["motor_name"] = motor_prop["Motor.Name"]
+    result["propeller_name"] = motor_prop["Propeller.Name"]
+    result['weight'] = (float(motor_prop['Motor.Weight [grams]']) +
+                        float(motor_prop['Propeller.Weight_g'])) * 0.001
     result['propeller_diameter'] = float(
-        combination["Propeller.Diameter_mm"]) * 0.001
+        motor_prop["Propeller.Diameter_mm"]) * 0.001
+    result['propeller_rpm_max'] = float(motor_prop["Propeller.RPM Max"])
+    result['propeller_rpm_min'] = float(motor_prop["Propeller.RPM Min"])
 
     # result.update(output_data)
 
@@ -147,6 +149,7 @@ def create_datapoint(combination: Dict[str, Any],
     result["torque"] = output_data["MaxVolt.Torque"]
     result["power"] = output_data["MaxVolt.Power"]
     result["current"] = output_data["MaxVolt.Current"]
+    result["net_thrust"] = result["thrust"] - 9.81 * result["weight"]
 
     # result["thrust_at40"] = output_data["MaxVolt_at40.Thrust"]
     # result["power_at40"] = output_data["MaxVolt_at40.Power"]
@@ -170,6 +173,7 @@ def create_datapoint(combination: Dict[str, Any],
     result["thrust_per_weight"] = result["thrust"] / result["weight"]
     result["power_per_weight"] = result["power"] / result["weight"]
     result["thrust_per_power"] = result["thrust"] / result["power"]
+    result["net_thrust_per_power"] = result["net_thrust"] / result["power"]
 
     return result
 
@@ -178,13 +182,10 @@ def motor_prop_datapoints(
         voltages: List[float],
         fdm_binary: str,
         propdata: str,
+        rpm_limits: bool,
         motor_prop: Dict[str, Any]) -> List[Dict[str, Any]]:
     result = []
-    max_voltage = None
     for voltage in voltages:
-        if max_voltage is not None and voltage < max_voltage * 0.25:
-            continue
-
         fdm_input = generate_fdm_input(
             motor_prop=motor_prop,
             voltage=voltage,
@@ -198,18 +199,28 @@ def motor_prop_datapoints(
         if output_data is None:
             continue
 
-        max_voltage = min(
-            output_data["MaxPower.Voltage"], output_data["MaxAmps.Voltage"])
-        if voltage < max_voltage * 0.25:
-            continue
+        datapoint = create_datapoint(motor_prop, output_data)
 
-        if output_data["MaxVolt.OmegaRpm"] < 0.0 or output_data["MaxVolt.Torque"] < 0.0:
-            continue
-
-        if output_data["MaxVolt.Voltage"] > max_voltage:
+        if datapoint["max_voltage"] < voltage:
             break
 
-        result.append(create_datapoint(motor_prop, output_data))
+        if rpm_limits:
+            if datapoint["max_omega_rpm"] < datapoint["propeller_rpm_min"]:
+                break
+
+            if datapoint["omega_rpm"] > datapoint["propeller_rpm_max"]:
+                break
+
+            if datapoint["omega_rpm"] < datapoint["propeller_rpm_min"]:
+                continue
+
+        if min(datapoint["omega_rpm"], datapoint["voltage"],
+               datapoint["power"], datapoint["thrust"],
+               datapoint["torque"], datapoint["current"]) < 0.0:
+            continue
+
+        result.append(datapoint)
+
     return result
 
 
@@ -234,6 +245,7 @@ def save_all_datapoints(
         fdm_binary: str,
         propdata: str,
         output: str,
+        rpm_limits: bool,
 ):
     voltages = sorted(voltages)
 
@@ -243,6 +255,7 @@ def save_all_datapoints(
             voltages=voltages,
             fdm_binary=fdm_binary,
             propdata=propdata,
+            rpm_limits=rpm_limits,
             motor_prop=motor_prop)
 
     print("Generating datapoints:")
@@ -268,6 +281,7 @@ def save_all_datapoints(
 
 def run_single(args=None):
     import argparse
+    import json
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -299,6 +313,12 @@ def run_single(args=None):
 
     print(fdm_output)
 
+    output_data = parse_fdm_output(fdm_output)
+    datapoint = create_datapoint(motor_prop, output_data)
+
+    print(json.dumps(datapoint, indent=2))
+
+
 def run(args=None):
     import argparse
 
@@ -308,8 +328,10 @@ def run(args=None):
                         default=os.path.relpath(
                             os.path.join(DATAPATH, 'propeller')),
                         metavar='DIR', help="path to propeller data directory")
-    parser.add_argument('--output', default='motor_propeller_analysis.csv',
+    parser.add_argument('--output', default='motor_propeller_analysis2.csv',
                         metavar='FILENAME', help="output file name")
+    parser.add_argument('--rpm-limits', action='store_true',
+                        help="use propeller table min/max RPM limits")
     parser.add_argument('--fdm', default='new_fdm', metavar='PATH',
                         help="path to fdm executable")
     parser.add_argument('--propeller', metavar='NAME',
@@ -334,7 +356,8 @@ def run(args=None):
         voltages=args.voltage,
         fdm_binary=args.fdm,
         propdata=args.propdata,
-        output=args.output)
+        output=args.output,
+        rpm_limits=args.rpm_limits)
 
 
 if __name__ == '__main__':
