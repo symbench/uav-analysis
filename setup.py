@@ -28,7 +28,7 @@ setup(
     install_requires=[
         'numpy',
         'sympy',
-        'scipy',
+        'scipy==1.7',
         'matplotlib',
     ],
     entry_points={

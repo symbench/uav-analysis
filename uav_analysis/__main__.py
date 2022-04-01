@@ -26,6 +26,7 @@ from . import battery_analysis
 from . import wing_analysis
 from . import aggregate_analysis
 from . import mass_properties_hackathon2
+from . import napkin_calculator
 
 
 def run():
@@ -42,6 +43,7 @@ def run():
         "wing-analysis",
         "aggregate-analysis",
         "mass-properties-hackathon2",
+        "napkin-calculator",
     ])))
     args = parser.parse_args(sys.argv[1:2])
 
@@ -67,8 +69,10 @@ def run():
         wing_analysis.run(args=sys.argv[2:])
     elif args.command == 'aggregate-analysis':
         aggregate_analysis.run(args=sys.argv[2:])
+    elif args.command == 'napkin-calculator':
+        napkin_calculator.run(args=sys.argv[2:])
     elif args.command == 'mass-properties-hackathon2':
-        mass_properties_hackathon2.run() #  params not wired yet
+        mass_properties_hackathon2.run()  # params not wired yet
     else:
         parser.print_help()
 
