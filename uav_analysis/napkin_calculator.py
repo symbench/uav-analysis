@@ -234,6 +234,187 @@ def shovel_big():
     shovel_napkin(motor_prop, batt, wing, forward_count=None)
 
 
+def tailsitter_napkin(motor_prop: Dict[str, float],
+                      batt: Dict[str, float],
+                      wing: Dict[str, float]):
+
+    series_count = int(math.floor(motor_prop["max_voltage"] / batt["voltage"]))
+
+    parallel_count = sympy.Symbol("parallel_count")
+    battery_pack = {
+        "weight": batt["weight"] * series_count * parallel_count,
+        "volume": batt["volume"] * series_count * parallel_count,
+        "energy": batt["energy"] * series_count * parallel_count,
+        "voltage": batt["voltage"] * series_count,
+        "current": batt["current"] * parallel_count,
+    }
+
+    motor_count = sympy.Symbol("motor_count")
+    motor_pack = {
+        "weight": motor_prop["weight"] * motor_count,
+        "thrust": motor_prop["thrust"] * motor_count,
+        "power": motor_prop["power"] * motor_count,
+        "current": motor_prop["current"] * motor_count,
+    }
+
+    total_span = sympy.Symbol("total_span")  # m
+    flying_speed = sympy.Symbol("flying_speed")  # m/s
+    wing_pack = {
+        "weight": wing["weight"] / wing["span"] * total_span,
+        "available_volume": wing["available_volume"] / wing["span"] * total_span,
+        "lift_force": wing["lift_50mps"] * (flying_speed / 50.0) ** 2 / wing["span"] * total_span,
+        "drag_force": wing["drag_50mps"] * (flying_speed / 50.0) ** 2 / wing["span"] * total_span,
+    }
+
+    air_density = 1.225                # kg/m^3
+    frontal_area = 2012345 * 1e-6      # m^2
+    fuselage = {
+        "weight": 350,
+        "drag_force": 0.5 * air_density * frontal_area * flying_speed ** 2,
+    }
+
+    aircraft_weight = fuselage["weight"] + battery_pack["weight"] + \
+        motor_pack["weight"] + wing_pack["weight"]
+    flying_time = battery_pack["energy"] / motor_pack["power"] * 3600.0
+    flying_distance = flying_time * flying_speed
+
+    gravitation = 9.81                 # m/s^2
+    constraints = {
+        "available_volume_equ": battery_pack["volume"] <= wing_pack["available_volume"],
+        "motor_current_equ": battery_pack["current"] >= motor_pack["current"],
+        "hower_thrust_equ": motor_pack["thrust"] >= aircraft_weight * gravitation,
+        "flying_lift_equ": wing_pack["lift_force"] >= aircraft_weight * gravitation,
+        "flying_thrust_equ": motor_pack["thrust"] >= fuselage["drag_force"] + wing_pack["drag_force"],
+        "flying_time_equ": flying_time <= 1000.0,
+    }
+
+    bounds = {
+        "parallel_count": (1.0, 1e6),
+        "motor_count": (1.0, 1e6),
+        "total_span": (10.0, 50.0),
+        "flying_speed": (0.0, 50.0),
+    }
+
+    report_func = PointFunc({
+        "series_count": series_count,
+        "aircraft_weight": aircraft_weight,
+        "flying_time": flying_time,
+        "flying_distance": flying_distance,
+        "battery_pack_voltage": battery_pack["voltage"],
+        "battery_pack_percent": 100.0 * battery_pack["volume"] / wing_pack["available_volume"],
+        "battery_pack_volume": battery_pack["volume"],
+        "battery_pack_current": battery_pack["current"],
+        "battery_pack_energy": battery_pack["energy"],
+        "motor_pack_current": motor_pack["current"],
+        "motor_pack_power": motor_pack["power"],
+        "motor_pack_thrust": motor_pack["thrust"],
+        "wing_available_volume": wing_pack["available_volume"],
+    })
+
+    # generate random points
+    num = 5000
+    points = PointCloud.generate(bounds, num)
+    constraints_func = PointFunc(constraints)
+
+    for step in range(5):
+        points.add_mutations(2.0, num)
+
+        points = points.newton_raphson(constraints_func, bounds, num_iter=10)
+        points = points.prune_by_tolerances(constraints_func(points), 0.1)
+
+        if False:
+            points = points.prune_close_points2(resolutions=0.1)
+
+        points = points.extend(report_func(points))
+        if True:
+            points = points.prune_pareto_front2({
+                "flying_distance": 1.0,
+                # "motor_count": -1.0,
+            })
+
+        print("designs: {}".format(points.num_points))
+        if points.num_points:
+            print(json.dumps(points.row(0), indent=2))
+
+    # points.plot2d("flying_distance", "motor_count")
+
+
+def tailsitter_big():
+    motor_prop = {
+        "motor_name": "MAGiDRIVE150",
+        "propeller_name": "62x5_2_3200_46_1150",
+        "weight": 35.831,
+        "propeller_diameter": 1.5748,
+        "voltage": 700.0,
+        "thrust": 1444.34,
+        "power": 74098.07,
+        "current": 105.85,
+        "max_voltage": 845.1,
+        "max_thrust": 1422.26,
+        "max_power": 126315.79,
+        "max_current": 149.47,
+    }
+
+    batt = {
+        "weight": 0.004,
+        "volume": 8.75e-05,
+        "energy": 11.1,
+        "voltage": 11.1,
+        "current": 25.0,
+        "name": "Vitaly Beta"
+    }
+
+    wing = {
+        "weight": 29.487522,
+        "lift_50mps": 9287.95,
+        "drag_50mps": 440.14,
+        "available_volume": 0.360,
+        "profile_name": "NACA 2418",
+        "chord": 1.0,
+        "span": 10.0
+    }
+
+    tailsitter_napkin(motor_prop, batt, wing)
+
+
+def tailsitter_small():
+    motor_prop = {
+        "motor_name": "KDE13218XF-105",
+        "propeller_name": "34x3_2_4600_41_250",
+        "weight": 2.313,
+        "propeller_diameter": 0.8636,
+        "voltage": 25.0,
+        "thrust": 106.04,
+        "power": 1743.54,
+        "current": 69.74,
+        "max_voltage": 38.29,
+        "max_thrust": 40.39,
+        "max_power": 6045.95,
+        "max_current": 157.89,
+    }
+
+    batt = {
+        "weight": 0.004,
+        "volume": 8.75e-05,
+        "energy": 11.1,
+        "voltage": 11.1,
+        "current": 25.0,
+        "name": "Vitaly Beta"
+    }
+
+    wing = {
+        "weight": 29.487522,
+        "lift_50mps": 9287.95,
+        "drag_50mps": 440.14,
+        "available_volume": 0.360,
+        "profile_name": "NACA 2418",
+        "chord": 1.0,
+        "span": 10.0
+    }
+
+    tailsitter_napkin(motor_prop, batt, wing)
+
+
 def run(args=None):
     import argparse
 
@@ -242,6 +423,8 @@ def run(args=None):
     parser.add_argument('test', choices=[
         "shovel-big",
         "shovel-small",
+        "tailsitter-small",
+        "tailsitter-big",
     ])
 
     args = parser.parse_args(args)
@@ -250,6 +433,10 @@ def run(args=None):
         shovel_big()
     elif args.test == "shovel-small":
         shovel_small()
+    elif args.test == "tailsitter-big":
+        tailsitter_big()
+    elif args.test == "tailsitter-small":
+        tailsitter_small()
     else:
         raise ValueError("unknown generator")
 

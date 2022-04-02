@@ -283,7 +283,7 @@ def run(args=None):
     parser.add_argument('--fdm',
                         default='new_fdm', metavar='PATH',
                         help="path to the new_fdm executable")
-    parser.add_argument('--speed', type=float, default=40.0,
+    parser.add_argument('--speed', type=float, default=50.0,
                         help='change the target speed')
     parser.add_argument('--naca', metavar='DDDD',
                         help='limits the search to this NACA number')
@@ -308,17 +308,17 @@ def run(args=None):
     if args.chord is not None:
         chords = [args.chord]
     else:
-        chords = range(500, 5500, 500)
+        chords = range(600, 2200, 200)
 
     if args.span is not None:
         spans = [args.span]
     else:
-        spans = range(1000, 16000, 1000)
+        spans = range(6000, 10500, 500)
 
     if args.max_load is not None:
         max_loads = [args.max_load]
     else:
-        max_loads = range(2000, 11000, 1000)
+        max_loads = range(5000, 9000, 1000)
 
     total = len(profiles) * len(chords) * len(spans) * len(max_loads) * 41
     if args.info:
