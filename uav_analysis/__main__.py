@@ -23,6 +23,7 @@ from . import mass_properties_hackathon1
 from . import testbench_data
 from . import motor_propeller_analysis
 from . import battery_analysis
+from . import battery_analysis2
 from . import wing_analysis
 from . import aggregate_analysis
 from . import mass_properties_hackathon2
@@ -40,6 +41,7 @@ def run():
         "motor-propeller-analysis",
         "motor-propeller-single",
         "battery-analysis",
+        "battery-analysis2",
         "wing-analysis",
         "aggregate-analysis",
         "mass-properties-hackathon2",
@@ -65,6 +67,8 @@ def run():
         motor_propeller_analysis.run_single(args=sys.argv[2:])
     elif args.command == 'battery-analysis':
         battery_analysis.run(args=sys.argv[2:])
+    elif args.command == 'battery-analysis2':
+        battery_analysis2.run(args=sys.argv[2:])
     elif args.command == 'wing-analysis':
         wing_analysis.run(args=sys.argv[2:])
     elif args.command == 'aggregate-analysis':
