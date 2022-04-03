@@ -16,7 +16,7 @@
 
 import os
 import json
-
+import sys
 
 """
 Helper class to quickly access fields of the flight dynamics data
