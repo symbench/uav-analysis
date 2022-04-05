@@ -192,7 +192,7 @@ def calc_geom_data(profile: str, chord1: float, chord2: float,
     available_volume = 1/6*span*(A*B+C*D+((A+C)*(B+D)))
 
     return {
-        "available_volume": available_volume,    # mm^3
+        "available_volume": available_volume * 1e-9,    # mm^3
     }
 
 
@@ -269,7 +269,9 @@ def datapoint_generator(
         lift_drags = parse_fdm_output(fdm_output, target_speed)
         for lift_drag in lift_drags:
             if lift_drag["flight_load"] * load_safety < comb["max_load"]:
-                yield {**comb, **lift_drag, **geom_data, **weight_data}
+                lift_per_drag = lift_drag["lift"] / lift_drag["drag"]
+                yield {**comb, **lift_drag, **geom_data, **weight_data,
+                       "lift_per_drag": lift_per_drag}
 
 
 def run(args=None):

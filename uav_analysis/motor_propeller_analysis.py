@@ -328,24 +328,19 @@ def run(args=None):
                         default=os.path.relpath(
                             os.path.join(DATAPATH, 'propeller')),
                         metavar='DIR', help="path to propeller data directory")
-    parser.add_argument('--output', default='motor_propeller_analysis2.csv',
+    parser.add_argument('--output', default='motor_propeller_analysis.csv',
                         metavar='FILENAME', help="output file name")
-    parser.add_argument('--rpm-limits', action='store_true',
-                        help="use propeller table min/max RPM limits")
+    parser.add_argument('--no-rpm-limits', action='store_true',
+                        help="do not use propeller table min/max RPM limits")
     parser.add_argument('--fdm', default='new_fdm', metavar='PATH',
                         help="path to fdm executable")
     parser.add_argument('--propeller', metavar='NAME',
                         help='limits the search space to this propeller')
     parser.add_argument('--motor', metavar='NAME',
                         help='limits the search space to this motor')
-    parser.add_argument('--voltage', metavar='V', nargs="*", default=[
-        0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0,
-        10.0, 12.5, 15.0, 17.5, 20.0, 25.0, 30.0, 40.0, 50.0, 80.0,
-        100.0, 150.0, 200.0, 250.0, 300.0, 350.0, 400.0, 450.0,
-        500.0, 550.0, 600.0, 650.0, 700.0, 750.0, 800.0, 850.0, 900.0,
-        1000.0, 1100.0, 1200.0, 1300.0, 1400.0, 1500.0
-    ],
-        help='limits the search space to these voltages')
+    parser.add_argument('--voltage', metavar='V', nargs="*",
+                        default=[51.8 * n for n in range(1, 21)],
+                        help='limits the search space to these voltages')
 
     args = parser.parse_args(args)
 
@@ -357,7 +352,7 @@ def run(args=None):
         fdm_binary=args.fdm,
         propdata=args.propdata,
         output=args.output,
-        rpm_limits=args.rpm_limits)
+        rpm_limits=not args.no_rpm_limits)
 
 
 if __name__ == '__main__':
