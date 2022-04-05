@@ -16,7 +16,7 @@
 
 import os
 import json
-
+import sys
 
 """
 Helper class to quickly access fields of the flight dynamics data
@@ -46,7 +46,21 @@ class FdmReport():
 		print(self.inp_files.keys())
 	
 	def get_vehicle_massprops(self):
-		pass
+		massprops = {}
+		lines = self.inp_files["path_1_inp"]
+		pattern = re.compile(r"aircraft%[I][x-zX-Z][x-zX-Z]")
+		pattern2 = re.compile(r"aircraft%[x-zX-Z]_[cf]+")
+		for line in lines:
+			match = pattern.finditer(line)
+			match2 = pattern2.finditer(line)
+			for instance in match:
+				values = instance.string.split()
+				massprops[values[0]] = values[-1]
+			for instance in match2:
+				values = instance.string.split()
+				massprops[values[0]] = values[-1]
+
+		return massprops
 
 	def get_score_info(self):
 		# return vehicle params
@@ -59,3 +73,7 @@ class FdmReport():
 		key = "  This routine finds steady solutions for lateral speeds of 0 to 50 m/s (Unorth).\n"
 		idxs = [idx for idx in range(len(lines)) if lines[idx] == key]
 		print(idxs)
+		
+if __name__ == "__main__":
+	report = FdmReport(run_folder=sys.argv[1])
+	print(report.get_vehicle_massprops())
