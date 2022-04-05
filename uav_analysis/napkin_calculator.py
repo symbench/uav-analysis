@@ -18,13 +18,17 @@ from typing import Any, Dict, Optional, Tuple
 
 import json
 import math
-from numpy import isin
+import numpy
 import sympy
 
 from .components import BATTERIES, WINGS
 
 from constraint_prog.point_cloud import PointCloud, PointFunc
 from constraint_prog.sympy_func import SympyFunc
+
+
+AIR_DENSITY = 1.225                # kg/m^3
+GRAVITATION = 9.81                 # m/s^2
 
 
 def shovel_napkin(motor_prop: Dict[str, float],
@@ -69,27 +73,25 @@ def shovel_napkin(motor_prop: Dict[str, float],
         "drag_force": wing_count * wing["drag_50mps"] * (flying_speed / 50.0) ** 2,
     }
 
-    air_density = 1.225                # kg/m^3
     frontal_area = 2012345 * 1e-6      # m^2
     fuselage = {
         "weight": 400,
-        "drag_force": 0.5 * air_density * frontal_area * flying_speed ** 2,
+        "drag_force": 0.5 * AIR_DENSITY * frontal_area * flying_speed ** 2,
     }
 
     aircraft_weight = fuselage["weight"] + battery_pack["weight"] + \
         forward_motor_prop["weight"] + \
         lifting_motor_prop["weight"] + moving_wing["weight"]
-    hower_time = battery_pack["energy"] / lifting_motor_prop["power"] * 3600.0
+    hover_time = battery_pack["energy"] / lifting_motor_prop["power"] * 3600.0
     flying_time = battery_pack["energy"] / forward_motor_prop["power"] * 3600.0
     flying_distance = flying_time * flying_speed
 
-    gravitation = 9.81                 # m/s^2
     constraints = {
         "available_volume_equ": battery_pack["volume"] <= moving_wing["available_volume"],
-        "hower_current_equ": battery_pack["current"] >= lifting_motor_prop["current"],
-        "hower_thrust_equ": lifting_motor_prop["thrust"] >= aircraft_weight * gravitation,
+        "hover_current_equ": battery_pack["current"] >= lifting_motor_prop["current"],
+        "hover_thrust_equ": lifting_motor_prop["thrust"] >= aircraft_weight * GRAVITATION,
         "flying_current_equ": battery_pack["current"] >= forward_motor_prop["current"],
-        "flying_lift_equ": moving_wing["lift_force"] >= aircraft_weight * gravitation,
+        "flying_lift_equ": moving_wing["lift_force"] >= aircraft_weight * GRAVITATION,
         "flying_thrust_equ": forward_motor_prop["thrust"] >= fuselage["drag_force"] + moving_wing["drag_force"],
     }
 
@@ -106,7 +108,7 @@ def shovel_napkin(motor_prop: Dict[str, float],
     report_func = PointFunc({
         "series_count": series_count,
         "aircraft_weight": aircraft_weight,
-        "hower_time": hower_time,
+        "hover_time": hover_time,
         "flying_time": flying_time,
         "flying_distance": flying_distance,
         "battery_pack_voltage": battery_pack["voltage"],
@@ -133,8 +135,8 @@ def shovel_napkin(motor_prop: Dict[str, float],
         points = points.newton_raphson(constraints_func, bounds, num_iter=10)
         points = points.prune_by_tolerances(constraints_func(points), {
             "available_volume_equ": 0.01,
-            "hower_current_equ": 0.1,
-            "hower_thrust_equ": 1.0,
+            "hover_current_equ": 0.1,
+            "hover_thrust_equ": 1.0,
             "flying_current_equ": 0.1,
             "flying_lift_equ": 1.0,
             "flying_thrust_equ": 1.0,
@@ -271,11 +273,10 @@ def tailsitter_napkin(motor_prop: Dict[str, float],
         "drag_force": wing["drag_50mps"] * (flying_speed / 50.0) ** 2 / wing["span"] * total_span,
     }
 
-    air_density = 1.225                # kg/m^3
     frontal_area = 2012345 * 1e-6      # m^2
     fuselage = {
         "weight": 350,
-        "drag_force": 0.5 * air_density * frontal_area * flying_speed ** 2,
+        "drag_force": 0.5 * AIR_DENSITY * frontal_area * flying_speed ** 2,
     }
 
     aircraft_weight = fuselage["weight"] + battery_pack["weight"] + \
@@ -283,12 +284,11 @@ def tailsitter_napkin(motor_prop: Dict[str, float],
     flying_time = battery_pack["energy"] / motor_pack["power"] * 3600.0
     flying_distance = flying_time * flying_speed
 
-    gravitation = 9.81                 # m/s^2
     constraints = {
         "available_volume_equ": battery_pack["volume"] <= wing_pack["available_volume"],
         "motor_current_equ": battery_pack["current"] >= motor_pack["current"],
-        "hower_thrust_equ": motor_pack["thrust"] >= aircraft_weight * gravitation,
-        "flying_lift_equ": wing_pack["lift_force"] >= aircraft_weight * gravitation,
+        "hover_thrust_equ": motor_pack["thrust"] >= aircraft_weight * GRAVITATION,
+        "flying_lift_equ": wing_pack["lift_force"] >= aircraft_weight * GRAVITATION,
         "flying_thrust_equ": motor_pack["thrust"] >= fuselage["drag_force"] + wing_pack["drag_force"],
         "flying_time_equ": flying_time <= 1000.0,
     }
@@ -429,64 +429,56 @@ def tailsitter_small():
     tailsitter_napkin(motor_prop, batt, wing)
 
 
-class BatteryPack():
+class BatteryModel():
     def __init__(self,
                  battery_name: str,
-                 pack_count: int,
                  series_count: Optional[int] = None,
-                 parallel_count: Optional[int] = None):
+                 parallel_count: Optional[int] = None,
+                 prefix: str = "battery"):
 
         battery = BATTERIES[battery_name]
         self.battery_name = battery_name
-        self.single_voltage = float(battery["Min Voltage [V]"])
-        self.single_capacity = float(battery["Capacity [Ah]"])
-        self.discharge_rate = float(battery["Cont. Discharge Rate [C]"])
-        self.single_current = self.single_capacity * self.discharge_rate
-        self.single_energy = self.single_capacity * self.single_voltage
-        self.single_weight = float(battery["Weight [kg]"])
-        self.single_volume = float(battery["Volume [mm^3]"]) * 1e-9
+        self.prefix = prefix
 
-        self.pack_count = pack_count
+        single_max_voltage = float(battery["Min Voltage [V]"])
+        single_capacity = float(battery["Capacity [Ah]"])
+        single_weight = float(battery["Weight [kg]"])
+        single_volume = float(battery["Volume [mm^3]"]) * 1e-9
+        discharge_rate = float(battery["Cont. Discharge Rate [C]"])
 
         if series_count is None:
-            series_count = sympy.Symbol("battery_series_count")
+            series_count = sympy.Symbol(self.prefix + "_series_count")
         self.series_count = series_count
 
         if parallel_count is None:
-            parallel_count = sympy.Symbol("battery_parallel_count")
+            parallel_count = sympy.Symbol(self.prefix + "_parallel_count")
         self.parallel_count = parallel_count
 
-        self.total_voltage = self.single_voltage * self.series_count
-        self.total_current = self.single_current * \
-            self.parallel_count * self.pack_count
-        self.total_capacity = self.single_capacity * \
-            self.parallel_count * self.pack_count
-        self.total_energy = self.single_energy * \
-            self.series_count * self.parallel_count * self.pack_count
-        self.total_weight = self.single_weight * \
-            self.series_count * self.parallel_count * self.pack_count
-        self.total_volume = self.single_volume * \
-            self.series_count * self.parallel_count * self.pack_count
+        self.max_voltage = single_max_voltage * self.series_count
+        self.capacity = single_capacity * self.parallel_count
+        self.weight = single_weight * self.series_count * self.parallel_count
+        self.volume = single_volume * self.series_count * self.parallel_count
+        self.max_current = self.capacity * discharge_rate
+        self.energy = self.max_voltage * self.capacity
 
     def bounds(self) -> Dict[str, Tuple[float, float]]:
         bounds = dict()
         if isinstance(self.series_count, sympy.Symbol):
             bounds[self.series_count.name] = (1.0, 100.0)
         if isinstance(self.parallel_count, sympy.Symbol):
-            bounds[self.parallel_count.name] = (1.0, 10.0)
+            bounds[self.parallel_count.name] = (1.0, 50.0)
         return bounds
 
     def report(self) -> Dict[str, Any]:
         report = {
-            "battery_series_count": self.series_count,
-            "battery_parallel_count": self.parallel_count,
-            "battery_total_voltage": self.total_voltage,
-            "battery_total_capacity": self.total_capacity,
-            "battery_total_current": self.total_current,
-            "battery_total_energy": self.total_energy,
-            "battery_total_weight": self.total_weight,
-            "battery_total_volume": self.total_volume,
-            "battery_pack_count": self.pack_count,
+            self.prefix + "_series_count": self.series_count,
+            self.prefix + "_parallel_count": self.parallel_count,
+            self.prefix + "_max_voltage": self.max_voltage,
+            self.prefix + "_max_current": self.max_current,
+            self.prefix + "_capacity": self.capacity,
+            self.prefix + "_energy": self.energy,
+            self.prefix + "_weight": self.weight,
+            self.prefix + "_volume": self.volume,
         }
         for var in self.bounds():
             assert var in report
@@ -534,7 +526,7 @@ class WingModel():
     def bounds(self) -> Dict[str, Tuple[float, float]]:
         bounds = dict()
         if isinstance(self.max_load, sympy.Symbol):
-            bounds[self.max_load.name] = (0.0, 1e9)
+            bounds[self.max_load.name] = (0.0, 20000.0)
         if isinstance(self.chord, sympy.Symbol):
             bounds[self.chord.name] = (0.1, 5.0)
         else:
@@ -665,8 +657,7 @@ class LiftModel():
         C_Lw = wing.wing_data["C_L0"] + wing.wing_data["a"] * self.angle
         C_Dw = wing.wing_data["C_D0"] + wing.wing_data["k"] * C_Lw ** 2
 
-        rho = 1.225  # air density
-        qbarprime_w = 0.5 * rho * self.speed ** 2
+        qbarprime_w = 0.5 * AIR_DENSITY * self.speed ** 2
 
         self.lift = wing.surface_area * qbarprime_w * C_Lw
         self.drag = wing.surface_area * qbarprime_w * C_Dw
@@ -703,107 +694,332 @@ class LiftModel():
 
     def equations(self):
         return {
-            self.prefix + "load_equ": self.lift ** 2 + self.drag ** 2 <= self.max_load ** 2
+            "equ_" + self.prefix + "_load": self.lift ** 2 + self.drag ** 2 <= 0.8 * self.max_load ** 2
         }
 
 
-def vudoo_napkin():
-    battery_pack = BatteryPack(
-        battery_name="Tattu 25Ah Li",
-        pack_count=2,
-        series_count=16,
-        # parallel_count=6,
-    )
+class MotorPropModel():
+    def __init__(self,
+                 motor_name: str,
+                 propeller_name: str,
+                 weight: float,
+                 voltage0: float,
+                 current0: float,
+                 thrust0: float,
+                 voltage1: float,
+                 current1: float,
+                 thrust1: float,
+                 voltage2: float,
+                 current2: float,
+                 thrust2: float,
+                 min_voltage: Optional[float] = None,
+                 max_voltage: Optional[float] = None):
+        assert voltage0 < voltage1 < voltage2
+        assert current0 < current1 < current2
+        assert thrust0 < thrust1 < thrust2
 
-    wing = WingModel(
-        naca_profile="0015",
-        max_load=20000,
-        # chord=1.4,
-        # span=8.0,
-    )
+        self.motor_name = motor_name
+        self.propeller_name = propeller_name
+        self.weight = weight
+
+        self.voltage0 = voltage0
+        self.current0 = current0
+        self.thrust0 = thrust0
+
+        self.voltage1 = voltage1
+        self.current1 = current1
+        self.thrust1 = thrust1
+
+        self.voltage2 = voltage2
+        self.current2 = current2
+        self.thrust2 = thrust2
+
+        if min_voltage is None:
+            self.min_voltage = min(voltage0, voltage1, voltage2)
+        else:
+            self.min_voltage = min_voltage
+
+        if max_voltage is None:
+            self.max_voltage = max(voltage0, voltage1, voltage2)
+        else:
+            self.max_voltage = max_voltage
+
+    @staticmethod
+    def quadratic_fit(
+            x0: float, x1: float, x2: float,
+            y0: float, y1: float, y2: float,
+            x: Any) -> Any:
+        assert x0 < x1 < x2
+
+        a = numpy.array([
+            [1, x0, x0 ** 2],
+            [1, x1, x1 ** 2],
+            [1, x2, x2 ** 2],
+        ])
+        b = numpy.array([y0, y1, y2])
+
+        c = numpy.linalg.solve(a, b)
+        return c[0] + c[1] * x + c[2] * x ** 2
+
+    def get_current(self, voltage: Any) -> Any:
+        return MotorPropModel.quadratic_fit(
+            self.voltage0, self.voltage1, self.voltage2,
+            self.current0, self.current1, self.current2,
+            voltage)
+
+    def get_thrust(self, voltage: Any) -> Any:
+        return MotorPropModel.quadratic_fit(
+            self.voltage0, self.voltage1, self.voltage2,
+            self.thrust0, self.thrust1, self.thrust2,
+            voltage)
+
+
+class ThrustModel():
+    def __init__(self,
+                 motor_prop: MotorPropModel,
+                 voltage: Optional[float] = None,
+                 min_voltage: Optional[float] = None,
+                 max_voltage: Optional[float] = None,
+                 prefix: str = "thrust"):
+
+        self.prefix = prefix
+
+        if min_voltage is None:
+            min_voltage = motor_prop.min_voltage
+        self.min_voltage = min_voltage
+
+        if max_voltage is None:
+            max_voltage = motor_prop.max_voltage
+        self.max_voltage = max_voltage
+
+        if voltage is None:
+            voltage = sympy.Symbol(self.prefix + "_voltage")
+        self.voltage = voltage
+
+        self.current = motor_prop.get_current(self.voltage)
+        self.power = self.voltage * self.current
+        self.thrust = motor_prop.get_thrust(self.voltage)
+
+    def bounds(self) -> Dict[str, Tuple[float, float]]:
+        bounds = dict()
+
+        if isinstance(self.voltage, sympy.Symbol):
+            bounds[self.voltage.name] = (self.min_voltage, self.max_voltage)
+        else:
+            assert self.min_voltage <= self.voltage <= self.max_voltage
+
+        return bounds
+
+    def report(self) -> Dict[str, Any]:
+        report = {
+            self.prefix + "_voltage": self.voltage,
+            self.prefix + "_current": self.current,
+            self.prefix + "_power": self.power,
+            self.prefix + "_thrust": self.thrust,
+        }
+        for var in self.bounds():
+            assert var in report
+            del report[var]
+        return report
+
+
+def vudoo_napkin():
+    motor_prop_count = 8
+    if False:
+        motor_prop = MotorPropModel(
+            motor_name="MAGiDRIVE150",
+            propeller_name="62x5_2_3200_46_1150",
+            weight=35.831,
+            voltage0=400.0,
+            current0=42.09,
+            thrust0=510.54,
+            voltage1=600.0,
+            current1=81.34,
+            thrust1=1088.06,
+            voltage2=828.8,
+            current2=144.13,
+            thrust2=1944.44,
+            min_voltage=348.0,
+            max_voltage=845.1,
+        )
+    elif True:
+        motor_prop = MotorPropModel(
+            motor_name="MAGiDRIVE300",
+            propeller_name="90x8_2_2000_41_2000",
+            weight=62.228,
+            voltage0=300.0,
+            current0=85.11,
+            thrust0=841.32,
+            voltage1=400.0,
+            current1=131.89,
+            thrust1=1415.16,
+            voltage2=500.0,
+            current2=188.34,
+            thrust2=2089.92,
+            min_voltage=268.0,
+            max_voltage=724.45,
+        )
+    elif False:
+        motor_prop = MotorPropModel(
+            motor_name="HPDM250",
+            propeller_name="62x5_2_3200_46_1150",
+            weight=15.831,
+            voltage0=155.4,
+            current0=314.58,
+            thrust0=1137.29,
+            voltage1=207.2,
+            current1=475.37,
+            thrust1=1396.82,
+            voltage2=259.0,
+            current2=657.33,
+            thrust2=1900.74,
+        )
+    elif True:
+        motor_prop = MotorPropModel(
+            motor_name="MAGiDRIVE150",
+            propeller_name="76x6_2_2400_41_1420",
+            weight=36.418,
+            voltage0=362.6,
+            current0=65.64,
+            thrust0=731.42,
+            voltage1=518.0,
+            current1=114.44,
+            thrust1=1337.72,
+            voltage2=673.4,
+            current2=173.2,
+            thrust2=2043.79,
+            min_voltage=288.0,
+            max_voltage=694.28,
+        )
+    else:
+        motor_prop = MotorPropModel(
+            motor_name="MAGiDRIVE150",
+            propeller_name="90x8_2_2000_41_2000",
+            weight=37.228,
+            voltage0=362.6,
+            current0=104.22,
+            thrust0=1009.43,
+            voltage1=466.2,
+            current1=148.99,
+            thrust1=1118.71332,
+            voltage2=569.8,
+            current2=198.13,
+            thrust2=1988.97,
+        )
+
+    battery_count = 2
+    if True:
+        battery = BatteryModel(
+            battery_name="Tattu 25Ah Li",
+            series_count=11,
+            parallel_count=5,
+        )
+    else:
+        battery = BatteryModel(
+            battery_name="Eagle 11 Ah Li",
+            series_count=51,
+            # parallel_count=4,
+        )
 
     wing_count = 2
+    wing = WingModel(
+        naca_profile="0015",
+        # max_load=10000,
+        chord=1.2,
+        span=7.0,
+    )
 
-    flying = LiftModel(wing=wing,
-                       # speed=50.0,
-                       # angle=0.765,
-                       prefix="flying")
+    fuselage_mass = 400                         # kg
+    fuselage_frontal_area = 2012345 * 1e-6      # m^2
 
-    motor_prop = {
-        "motor_name": "MAGiDRIVE150",
-        "propeller_name": "62x5_2_3200_46_1150",
-        "weight": 35.831,
-        "propeller_diameter": 1.5748,
-        "voltage": 828.8,
-        "thrust": 1944.44,
-        "power": 119456.52,
-        "current": 144.13,
-        "max_voltage": 845.1,
-        # "max_thrust": 1582.81,
-        "max_power": 126315.79,
-    }
+    aircraft_mass = fuselage_mass + \
+        battery.weight * battery_count + \
+        motor_prop.weight * motor_prop_count + \
+        wing.weight * wing_count
+    aircraft_weight = aircraft_mass * GRAVITATION
+    aircraft_capacity = battery.capacity * battery_count * 0.8
 
-    motor_count = 16
+    flying_motor = ThrustModel(
+        motor_prop=motor_prop,
+        voltage=None,
+        min_voltage=motor_prop.min_voltage,
+        #        max_voltage=battery.max_voltage,
+        max_voltage=motor_prop.max_voltage,
+        prefix="flying_motor"
+    )
 
-    if motor_count is None:
-        motor_count = sympy.Symbol("motor_count")
-    motor_pack = {
-        "weight": motor_prop["weight"] * motor_count,
-        "thrust": motor_prop["thrust"] * motor_count,
-        "power": motor_prop["power"] * motor_count,
-        "current": motor_prop["current"] * motor_count,
-    }
+    flying_wing = LiftModel(wing=wing,
+                            # speed=50.0,
+                            # angle=0.765,
+                            prefix="flying_wing")
 
-    flying_time = battery_pack.total_energy / motor_pack["power"] * 3600.0
-    flying_distance = flying_time * flying.speed
+    flying_time = sympy.Symbol("flying_time")
+    flying_distance = flying_time * flying_wing.speed
+    flying_fuselage_drag = 0.5 * AIR_DENSITY * fuselage_frontal_area * \
+        flying_wing.speed ** 2
 
-    air_density = 1.225                # kg/m^3
-    frontal_area = 2012345 * 1e-6      # m^2
-    fuselage = {
-        "weight": 350,
-        "drag_force": 0.5 * air_density * frontal_area * flying.speed ** 2,
-    }
+    flying_total_lift = flying_wing.lift * wing_count
+    flying_total_thrust = flying_motor.thrust * motor_prop_count
+    flying_total_drag = flying_fuselage_drag + flying_wing.drag * wing_count
 
-    aircraft_weight = fuselage["weight"] + battery_pack.total_weight + \
-        motor_pack["weight"] + wing.weight * wing_count
+    hover_motor = ThrustModel(
+        motor_prop=motor_prop,
+        voltage=None,
+        min_voltage=motor_prop.min_voltage,
+        #        max_voltage=battery.max_voltage,
+        max_voltage=motor_prop.max_voltage,
+        prefix="hover_motor"
+    )
 
-    gravitation = 9.81                 # m/s^2
+    hover_time = sympy.Symbol("hover_time")
+    hover_total_thrust = hover_motor.thrust * motor_prop_count
+
     constraints = {
-        **flying.equations(),
-        "available_volume_equ": battery_pack.total_volume <= wing.available_volume * wing_count,
-        "motor_current_equ": battery_pack.total_current >= motor_pack["current"],
-        "hower_thrust_equ": motor_pack["thrust"] >= aircraft_weight * gravitation,
-        "flying_lift_equ": flying.lift * wing_count >= aircraft_weight * gravitation,
-        "flying_thrust_equ": motor_pack["thrust"] >= fuselage["drag_force"] + flying.drag * wing_count,
-        "flying_time_equ": flying_time <= 1000.0,
+        **flying_wing.equations(),
+        "equ_battery_volume": battery.volume * battery_count <= wing.available_volume * wing_count,
+        "equ_hover_current": battery.max_current * battery_count >= hover_motor.current * motor_prop_count,
+        "equ_hover_voltage": battery.max_voltage >= hover_motor.voltage,
+        "equ_hover_capacity": aircraft_capacity * 3600.0 >= hover_motor.current * motor_prop_count * hover_time,
+        "equ_hover_thrust": hover_total_thrust >= aircraft_weight,
+        "equ_flying_current": battery.max_current * battery_count >= flying_motor.current * motor_prop_count,
+        "equ_flying_voltage": battery.max_voltage >= flying_motor.voltage,
+        "equ_flying_capacity": aircraft_capacity * 3600.0 >= flying_motor.current * motor_prop_count * flying_time,
+        "equ_flying_lift": flying_total_lift >= aircraft_weight,
+        "equ_flying_drag": flying_total_thrust >= flying_total_drag,
     }
 
     bounds = {
-        **battery_pack.bounds(),
+        **flying_motor.bounds(),
+        **hover_motor.bounds(),
+        **battery.bounds(),
         **wing.bounds(),
-        **flying.bounds(),
+        **flying_wing.bounds(),
+        "flying_time": (0.0, 1000.0),
+        "hover_time": (0.0, 400.0),
     }
 
-    if isinstance(motor_count, sympy.Symbol):
-        bounds["motor_count"] = (1.0, 30.0)
-
     report_func = PointFunc({
-        **battery_pack.report(),
+        **flying_motor.report(),
+        **hover_motor.report(),
+        **battery.report(),
         **wing.report(),
-        **flying.report(),
-        "flying_time": flying_time,
+        **flying_wing.report(),
+        "motor_prop_count": motor_prop_count,
+        "wing_count": wing_count,
+        "battery_count": battery_count,
         "flying_distance": flying_distance,
+        "aircraft_mass": aircraft_mass,
         "aircraft_weight": aircraft_weight,
-        "battery_pack_volume_percent": 100.0 * battery_pack.total_volume / (wing.available_volume * wing_count),
-        "motor_pack_current": motor_pack["current"],
-        "motor_pack_power": motor_pack["power"],
-        "motor_pack_thrust": motor_pack["thrust"],
-        "motor_pack_weight": motor_pack["weight"],
-        "fuselage_drag_force": fuselage["drag_force"],
+        "volume_percent": 100.0 * battery.volume / wing.available_volume,
+        "flying_fuselage_drag": flying_fuselage_drag,
+        "flying_total_lift": flying_total_lift,
+        "flying_total_drag": flying_total_drag,
+        "flying_total_thrust": flying_total_thrust,
+        "hover_total_thrust": hover_total_thrust,
     })
 
     # generate random points
-    num = 5000
+    num = 1000
     points = PointCloud.generate(bounds, num)
     constraints_func = PointFunc(constraints)
 
@@ -811,27 +1027,29 @@ def vudoo_napkin():
         points.add_mutations(2.0, num)
 
         points = points.newton_raphson(constraints_func, bounds, num_iter=10)
-        points = points.extend(constraints_func(points))
 
+        tol = 100.0 if step == 0 else 10.0 if step == 1 else 1.0 if step == 2 else 0.1
         points = points.prune_by_tolerances(
-            constraints_func(points), tolerances=0.1)
+            constraints_func(points), tolerances=tol)
 
         if False:
             points = points.prune_close_points2(resolutions=0.1)
 
         points = points.extend(report_func(points, equs_as_float=False))
+        points = points.extend(constraints_func(points, equs_as_float=True))
+
         if True:
             points = points.prune_pareto_front2({
                 "flying_distance": 1.0,
-                # "flying_drag": -1.0,
-                "aircraft_weight": -1.0,
+                "hover_time": 1.0,
+                # "aircraft_weight": -1.0,
             })
 
         print("designs: {}".format(points.num_points))
         if points.num_points:
-            print(json.dumps(points.row(0), indent=2))
+            print(json.dumps(points.row(0), indent=2, sort_keys=True))
 
-    points.plot2d("flying_distance", "aircraft_weight")
+    points.plot2d("flying_distance", "hover_time")
 
 
 def run(args=None):
@@ -839,28 +1057,27 @@ def run(args=None):
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('test', choices=[
+    parser.add_argument('design', choices=[
         "shovel-big",
         "shovel-small",
         "tailsitter-small",
         "tailsitter-big",
         "vudoo",
     ])
-
     args = parser.parse_args(args)
 
-    if args.test == "shovel-big":
+    if args.design == "shovel-big":
         shovel_big()
-    elif args.test == "shovel-small":
+    elif args.design == "shovel-small":
         shovel_small()
-    elif args.test == "tailsitter-big":
+    elif args.design == "tailsitter-big":
         tailsitter_big()
-    elif args.test == "tailsitter-small":
+    elif args.design == "tailsitter-small":
         tailsitter_small()
-    elif args.test == "vudoo":
+    elif args.design == "vudoo":
         vudoo_napkin()
     else:
-        raise ValueError("unknown generator")
+        raise ValueError("unknown design")
 
 
 if __name__ == '__main__':

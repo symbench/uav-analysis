@@ -1,0 +1,5 @@
+series_count,voltage,capacity,current,weight,volume,energy,energy_per_weight,current_per_weight,name
+1.0,51.8,25.0,625.0,9.54,0.005991804,1295.0,135.74423,65.513626,Tattu 25Ah Li
+1.0,28.0,55.0,1210.0,22.23,0.012905171,1540.0,69.27576,54.43095,Avionic 55Ah Ni
+1.0,14.4,11.0,5.06,1.18,0.00076551747,158.4,134.23729,4.2881355,Eagle 11 Ah Li
+1.0,11.1,1.0,0.01,0.004,8.75e-05,11.1,2775.0,2.5,Vitaly Beta
