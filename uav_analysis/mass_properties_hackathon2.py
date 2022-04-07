@@ -117,7 +117,7 @@ class MassPropertyPredictor():  # updated version will take MassPropertyDataset 
 		print(f"target data {self.dataset.target_data} shape {self.dataset.target_data.shape}")
 		for ov in self.dataset.output_names:
 			self.dataset.update_target(ov)
-			subs, error = fa.approximate(f, self.dataset.input_dict, self.dataset.target_data.ravel())
+			subs, error = fa.approximate(f, self.dataset.input_dict, self.dataset.target_data)
 			self.predictors[ov] = (subs, error)
 
 
