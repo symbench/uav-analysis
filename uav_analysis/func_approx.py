@@ -14,11 +14,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Set, Dict, List, Callable, Optional
+from typing import Set, Dict, List, Callable, Optional, Generator
 
+import math
 import numpy
 import sympy
-from scipy import optimize
+import scipy.optimize
+
+
+def parameters(prefix: str = "param") -> Generator[sympy.Symbol, None, None]:
+    idx = 0
+    while True:
+        idx += 1
+        yield sympy.Symbol(prefix + str(idx))
 
 
 def get_symbols(expr: sympy.Expr) -> Set[str]:
@@ -97,6 +105,7 @@ def approximate(func: sympy.Expr, input_data: Dict[str, numpy.ndarray],
 
     symbols = get_symbols(func)
     param_vars = list(symbols - set(input_data.keys()))
+    assert len(param_vars) >= 1
 
     # common shape
     shape = numpy.broadcast(*input_data.values(), output_data).shape
@@ -125,7 +134,7 @@ def approximate(func: sympy.Expr, input_data: Dict[str, numpy.ndarray],
             return result
 
     init = numpy.zeros(shape=(len(param_vars),))
-    result = optimize.least_squares(
+    result = scipy.optimize.least_squares(
         fun=Function(),
         x0=init,
         jac=Jacobian(),
@@ -140,7 +149,7 @@ def approximate(func: sympy.Expr, input_data: Dict[str, numpy.ndarray],
 
 def linear_approx(func: sympy.Expr, input_data: Dict[str, numpy.ndarray],
                   output_data: numpy.ndarray,
-                  rcond: Optional[float] = None) -> Dict[str, float]:
+                  rcond: Optional[float] = 1e-20) -> Dict[str, float]:
     """
     Takes a symbolic expression, and input dataset and and output dataset.
     All dataset arrays must be of the same shape or at least broadcastable.
@@ -151,47 +160,71 @@ def linear_approx(func: sympy.Expr, input_data: Dict[str, numpy.ndarray],
     cutoff ratio for the small singular values.
     """
 
+    if False:
+        for key, val in input_data.items():
+            print("Input", key, "shape:", val.shape)
+        print("Output shape:", output_data.shape)
+
     symbols = get_symbols(func)
     param_vars = list(symbols - set(input_data.keys()))
+    assert len(param_vars) >= 1
 
     # common shape
     shape = numpy.broadcast(*input_data.values(), output_data).shape
 
-    matirx = numpy.empty(shape=(numpy.prod(shape), len(param_vars)))
+    matrix = numpy.empty(shape=(numpy.prod(shape), len(param_vars)))
     for idx, var in enumerate(param_vars):
         diff = func.diff(var)
         diff = evaluate(diff, input_data)
         diff = numpy.broadcast_to(diff, shape)
-        matirx[:, idx] = diff.flatten()
+        matrix[:, idx] = diff.flatten()
 
     output_data = numpy.broadcast_to(output_data, shape).flatten()
-    result, cost, _, _ = numpy.linalg.lstsq(matirx, output_data, rcond=rcond)
+    result, cost, rank, sings = numpy.linalg.lstsq(
+        matrix, output_data, rcond=rcond)
 
+    if rank < len(param_vars):
+        print("Matrix shape:", matrix.shape)
+        print("Matrix rank:", rank)
+        print("Singular values:", sings)
+        raise ValueError("Singluar problem")
+
+    assert len(cost) == 1
     return {var: result[idx] for idx, var in enumerate(param_vars)}, cost[0]
+
+
+def approx_error(func: sympy.Expr, input_data: Dict[str, numpy.ndarray],
+                 output_data: numpy.ndarray) -> float:
+    data = evaluate(func, input_data) - output_data
+    return math.sqrt(numpy.mean(numpy.square(data)))
 
 
 if __name__ == '__main__':
     a = sympy.Symbol('a')
     b = sympy.Symbol('b')
+    c = sympy.Symbol('c')
+    d = sympy.Symbol('d')
     x = sympy.Symbol('x')
-    y = a * x + b
+    y = sympy.Symbol('y')
+    expr = a * x + b * y + c * y ** 3 + d
 
-    xs = {
-        'x': numpy.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+    input_data = {
+        'x': numpy.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]),
+        'y': numpy.array([[1.0, 0.0, 2.0], [0.0, 1.0, 0.0]]),
     }
-    ys = numpy.array([[3.0, 5.0, 7.0], [9.0, 11.0, 13.0]])
+    output_data = numpy.array([[3.0, 5.0, 13.0], [9.0, 11.0, 13.0]])
 
-    print("Expression:", y)
+    print("Expression:", expr)
     print("Input:")
-    print(xs)
+    print(input_data)
     print("Output:")
-    print(ys)
+    print(output_data)
 
-    subs, err = approximate(y, xs, ys)
+    subs, err = linear_approx(expr, input_data, output_data)
     print("Substitution:", subs)
     print("Error:", err)
 
-    y = y.subs(subs)
-    print("Expression:", y)
+    expr = expr.subs(subs)
+    print("Expression:", expr)
     print("Approximate output:")
-    print(evaluate(y, xs))
+    print(evaluate(expr, input_data))

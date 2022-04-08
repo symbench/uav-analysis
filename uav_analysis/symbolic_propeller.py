@@ -85,38 +85,43 @@ def approximate_table(table: List[Entry]) -> sympy.Expr:
     rpm = sympy.Symbol("rpm")
     j = sympy.Symbol("j")
 
-    order = 4
-    param = 1
+    params = func_approx.parameters()
     expr = 0
-    for n in range(0, order + 1):
-        for m in range(0, order + 1):
-            if n + m > order:
+    for n in range(0, 5):
+        for m in range(0, 5):
+            if n + m > 4:
                 continue
-            e = sympy.Symbol("p" + str(param))
-            param += 1
+            e = next(params)
+
             if n == 1:
                 e = e * rpm
             elif n > 1:
                 e = e * rpm ** n
+
             if m == 1:
                 e = e * j
             elif m > 1:
                 e = e * j ** m
+
             expr = expr + e
 
-    sub, err = func_approx.approximate(
+    sub, err = func_approx.linear_approx(
         func=expr,
         input_data={"rpm": rpms, "j": js},
         output_data=cts)
     ct_expr = expr.subs(sub)
     print("Ct approximation error:", err)
+    print("Ct real approx error:", func_approx.approx_error(
+        ct_expr, {"rpm": rpms, "j": js}, cts))
 
-    sub, err = func_approx.approximate(
+    sub, err = func_approx.linear_approx(
         func=expr,
         input_data={"rpm": rpms, "j": js},
         output_data=cps)
     cp_expr = expr.subs(sub)
     print("Cp approximation error:", err)
+    print("Cp real approx error:", func_approx.approx_error(
+        cp_expr, {"rpm": rpms, "j": js}, cps))
 
     return ct_expr, cp_expr
 
@@ -177,7 +182,7 @@ def run(args=None):
         table = read_propeller_table(file)
         interpolate_table(table)
         ct_expr, cp_expr = approximate_table(table)
-        plot_table_data(table, ct_expr, cp_expr)
+        # plot_table_data(table, ct_expr, cp_expr)
         break
 
 
