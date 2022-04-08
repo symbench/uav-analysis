@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Set, Dict, List, Callable, Optional, Generator
+from typing import Set, Dict, List, Callable, Optional, Generator, Iterator
 
 import math
 import numpy
@@ -23,10 +23,44 @@ import scipy.optimize
 
 
 def parameters(prefix: str = "param") -> Generator[sympy.Symbol, None, None]:
+    """
+    A simple generator that returns fres parameters when needed.
+    """
+
     idx = 0
     while True:
         idx += 1
         yield sympy.Symbol(prefix + str(idx))
+
+
+def powers(params: Iterator[sympy.Symbol], vars: List[sympy.Symbol],
+           degree: int) -> sympy.Expr:
+    """
+    Returns all combination of products of powers of variables multiplied by
+    fress parameters where the total degree is the specified one.
+    """
+
+    assert degree >= 0
+    if degree == 0:
+        return 1.0
+
+    result = [[]]
+    for _ in range(degree):
+        result2 = []
+        for elem1 in result:
+            start = max(elem1) if elem1 else 0
+            for elem2 in range(start, len(vars)):
+                result2.append(elem1 + [elem2])
+        result = result2
+
+    sum = 0
+    for elem1 in result:
+        value = next(params)
+        for idx in elem1:
+            value = value * vars[idx]
+        sum = sum + value
+
+    return sum
 
 
 def get_symbols(expr: sympy.Expr) -> Set[str]:
@@ -199,7 +233,7 @@ def approx_error(func: sympy.Expr, input_data: Dict[str, numpy.ndarray],
     return math.sqrt(numpy.mean(numpy.square(data)))
 
 
-if __name__ == '__main__':
+def test1():
     a = sympy.Symbol('a')
     b = sympy.Symbol('b')
     c = sympy.Symbol('c')
@@ -228,3 +262,14 @@ if __name__ == '__main__':
     print("Expression:", expr)
     print("Approximate output:")
     print(evaluate(expr, input_data))
+
+
+def test2():
+    params = parameters()
+    print(powers(params,
+                 [sympy.Symbol("a"), sympy.Symbol("b"), sympy.Symbol("c")],
+                 3))
+
+
+if __name__ == '__main__':
+    test1()

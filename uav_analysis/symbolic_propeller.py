@@ -77,51 +77,32 @@ def interpolate_table(table: List[Entry]) -> Dict[str, numpy.ndarray]:
 
 
 def approximate_table(table: List[Entry]) -> sympy.Expr:
-    rpms = numpy.array([entry.rpm for entry in table])
-    js = numpy.array([entry.j for entry in table])
-    cts = numpy.array([entry.ct for entry in table])
-    cps = numpy.array([entry.cp for entry in table])
+    table = numpy.array(table)  # rpm, j, ct, cp
+    input_data = {"rpm": table[:, 0], "j": table[:, 1]}
+    cts = table[:, 2]
+    cps = table[:, 3]
 
     rpm = sympy.Symbol("rpm")
     j = sympy.Symbol("j")
 
     params = func_approx.parameters()
-    expr = 0
-    for n in range(0, 5):
-        for m in range(0, 5):
-            if n + m > 4:
-                continue
-            e = next(params)
+    expr = next(params)
+    expr += func_approx.powers(params, [rpm, j], 1)
+    expr += func_approx.powers(params, [rpm, j], 2)
+    expr += func_approx.powers(params, [rpm, j], 3)
 
-            if n == 1:
-                e = e * rpm
-            elif n > 1:
-                e = e * rpm ** n
-
-            if m == 1:
-                e = e * j
-            elif m > 1:
-                e = e * j ** m
-
-            expr = expr + e
-
-    sub, err = func_approx.linear_approx(
-        func=expr,
-        input_data={"rpm": rpms, "j": js},
-        output_data=cts)
+    sub, err = func_approx.linear_approx(expr, input_data, cts)
     ct_expr = expr.subs(sub)
-    print("Ct approximation error:", err)
-    print("Ct real approx error:", func_approx.approx_error(
-        ct_expr, {"rpm": rpms, "j": js}, cts))
+    # print("Ct approximation error:", err)
+    print(ct_expr)
+    print("Ct real approx error: {:.2f}".format(func_approx.approx_error(
+        ct_expr, input_data, cts)))
 
-    sub, err = func_approx.linear_approx(
-        func=expr,
-        input_data={"rpm": rpms, "j": js},
-        output_data=cps)
+    sub, err = func_approx.linear_approx(expr, input_data, cps)
     cp_expr = expr.subs(sub)
-    print("Cp approximation error:", err)
-    print("Cp real approx error:", func_approx.approx_error(
-        cp_expr, {"rpm": rpms, "j": js}, cps))
+    # print("Cp approximation error:", err)
+    print("Cp real approx error: {:.2f}".format(func_approx.approx_error(
+        cp_expr, input_data, cps)))
 
     return ct_expr, cp_expr
 
@@ -178,12 +159,13 @@ def run(args=None):
                         help="propeller files to read")
     args = parser.parse_args(args)
 
-    for file in args.files:
-        table = read_propeller_table(file)
+    for filename in args.files:
+        print(filename)
+        table = read_propeller_table(filename)
         interpolate_table(table)
         ct_expr, cp_expr = approximate_table(table)
-        # plot_table_data(table, ct_expr, cp_expr)
-        break
+        plot_table_data(table, ct_expr, cp_expr)
+        # break
 
 
 if __name__ == '__main__':
