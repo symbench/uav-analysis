@@ -668,9 +668,9 @@ class LiftModel():
         bounds = dict()
 
         if isinstance(self.speed, sympy.Symbol):
-            bounds[self.speed.name] = (0.0, 50.0)
+            bounds[self.speed.name] = (0.0, 2 * 50.0)
         else:
-            assert 0 <= self.speed <= 50.0
+            assert 0 <= self.speed <= 2 * 50.0
 
         if isinstance(self.angle, sympy.Symbol):
             bounds[self.angle.name] = (self.min_angle, self.max_angle)
@@ -912,7 +912,7 @@ def vudoo_napkin():
         battery = BatteryModel(
             battery_name="Tattu 25Ah Li",
             series_count=11,
-            parallel_count=5,
+            # parallel_count=5,
         )
     else:
         battery = BatteryModel(
@@ -925,8 +925,8 @@ def vudoo_napkin():
     wing = WingModel(
         naca_profile="0015",
         # max_load=10000,
-        chord=1.2,
-        span=7.0,
+        # chord=1.2,
+        # span=7.0,
     )
 
     fuselage_mass = 400                         # kg
@@ -944,7 +944,7 @@ def vudoo_napkin():
         voltage=None,
         min_voltage=motor_prop.min_voltage,
         #        max_voltage=battery.max_voltage,
-        max_voltage=motor_prop.max_voltage,
+        max_voltage=min(motor_prop.max_voltage, battery.max_voltage),
         prefix="flying_motor"
     )
 
@@ -967,7 +967,7 @@ def vudoo_napkin():
         voltage=None,
         min_voltage=motor_prop.min_voltage,
         #        max_voltage=battery.max_voltage,
-        max_voltage=motor_prop.max_voltage,
+        max_voltage=min(motor_prop.max_voltage, battery.max_voltage),
         prefix="hover_motor"
     )
 
@@ -994,8 +994,8 @@ def vudoo_napkin():
         **battery.bounds(),
         **wing.bounds(),
         **flying_wing.bounds(),
-        "flying_time": (0.0, 1000.0),
-        "hover_time": (0.0, 400.0),
+        "flying_time": (0.0, 2*1000.0),
+        "hover_time": (0.0, 2*400.0),
     }
 
     report_func = PointFunc({
@@ -1019,21 +1019,19 @@ def vudoo_napkin():
     })
 
     # generate random points
-    num = 1000
+    num = 5000
     points = PointCloud.generate(bounds, num)
     constraints_func = PointFunc(constraints)
 
-    for step in range(5):
-        points.add_mutations(2.0, num)
+    for step in range(100):
+        tol = 100.0 if step == 0 else 10.0 if step == 1 else 1.0 if step == 2 else 0.1
+
+        points.add_mutations(tol, num)
 
         points = points.newton_raphson(constraints_func, bounds, num_iter=10)
 
-        tol = 100.0 if step == 0 else 10.0 if step == 1 else 1.0 if step == 2 else 0.1
         points = points.prune_by_tolerances(
             constraints_func(points), tolerances=tol)
-
-        if False:
-            points = points.prune_close_points2(resolutions=0.1)
 
         points = points.extend(report_func(points, equs_as_float=False))
         points = points.extend(constraints_func(points, equs_as_float=True))
@@ -1045,11 +1043,45 @@ def vudoo_napkin():
                 # "aircraft_weight": -1.0,
             })
 
-        print("designs: {}".format(points.num_points))
+        if False:
+            points = points.prune_close_points2(resolutions=0.1)
+
+        print("step {} designs: {}".format(step, points.num_points))
         if points.num_points:
             print(json.dumps(points.row(0), indent=2, sort_keys=True))
 
+        points.save("pareto_step_{}.csv".format(step))
+
+    points.save("vudoo_designs.csv")
     points.plot2d("flying_distance", "hover_time")
+
+
+def plot_pareto_steps():
+    import matplotlib.pyplot as plt
+    var1 = "flying_distance"
+    var2 = "hover_time"
+
+    fig, ax1 = plt.subplots()
+    for step in [0, 1, 2, 4, 9, 99]:
+        points = PointCloud.load("pareto_step_{}.csv".format(step))
+        points = points.prune_bounding_box({'hover_time': (400, 1000)})
+
+        c = max(170 - step, 0)
+        ax1.scatter(
+            x=points[var1].numpy(),
+            y=points[var2].numpy(),
+            s=25,
+            #color="#{:02x}{:02x}{:02x}".format(c, c, c),
+            label="step {}".format(step+1))
+
+    ax1.set_xlabel("Flying distance (m)")
+    ax1.set_ylabel("Hover time (s)")
+    ax1.set_title("Flying distance vs hover time Pareto-front")
+
+    ax1.grid()
+    ax1.legend()
+
+    plt.show()
 
 
 def run(args=None):
@@ -1063,6 +1095,7 @@ def run(args=None):
         "tailsitter-small",
         "tailsitter-big",
         "vudoo",
+        "plot-pareto-steps",
     ])
     args = parser.parse_args(args)
 
@@ -1076,6 +1109,8 @@ def run(args=None):
         tailsitter_small()
     elif args.design == "vudoo":
         vudoo_napkin()
+    elif args.design == "plot-pareto-steps":
+        plot_pareto_steps()
     else:
         raise ValueError("unknown design")
 
