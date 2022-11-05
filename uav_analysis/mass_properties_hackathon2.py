@@ -126,7 +126,7 @@ class MassPropertyPredictor():  # updated version will take MassPropertyDataset 
 
 
 
-def run(data_path: str = os.path.join(os.path.abspath(os.getcwd()), "uav_analysis", "data_hackathon2_uam")):
+def run(data_path: str = os.path.join(os.path.abspath(os.getcwd()), "uav_analysis", "data_12")):
 
 	wing_massprops_data_path = os.path.join(data_path, "wing_massprops")
 	wing_invar_names = ["CHORD_1", "SPAN", "THICKNESS"]
@@ -154,6 +154,6 @@ def run(data_path: str = os.path.join(os.path.abspath(os.getcwd()), "uav_analysi
 	cp.fit()
 if __name__ == "__main__":
 	#  path hack for direct calls to script during development
-	data_path = os.path.join(os.getcwd(), "data_hackathon2_uam")
+	data_path = os.path.join(os.getcwd(), "data_12")
 	
 	run(data_path)

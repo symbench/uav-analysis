@@ -67,7 +67,7 @@ def run(args=None):
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--propdata',
                         default=os.path.relpath(os.path.join(
-                            os.path.dirname(__file__), 'data_hackathon1', 'propeller')),
+                            os.path.dirname(__file__), 'data_11', 'propeller')),
                         type=str,
                         metavar='DIR',
                         help="path to propeller data directory")

@@ -22,7 +22,7 @@ import math
 import os
 
 DATAPATH = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                        'data_hackathon2_uam')
+                        'data_12')
 
 
 def load_static_data(name: str) -> Dict[str, Dict[str, Any]]:
