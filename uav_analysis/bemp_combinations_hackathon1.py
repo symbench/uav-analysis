@@ -23,7 +23,7 @@ import sys
 
 def load_static_data(name: str) -> Dict[str, Dict[str, Any]]:
     filename = os.path.abspath(os.path.dirname(__file__))
-    filename = os.path.join(filename, 'data_11', name + '.csv')
+    filename = os.path.join(filename, 'data_hackathon1', name + '.csv')
 
     result = dict()
     with open(filename) as file:

@@ -24,7 +24,7 @@ import sys
 from .components import MOTORS, PROPELLERS
 
 DATAPATH = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                        'data_12')
+                        'data_demo1')
 
 
 def csv_generator(filename: str) -> Generator[Dict[str, Any], None, None]:
