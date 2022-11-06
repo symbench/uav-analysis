@@ -14,37 +14,42 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from gettext import find
 from typing import Dict, Any, Tuple
 
 import csv
+import json
 import math
 import os
 
 DATAPATH = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                        'data_demo1')
+                        'data_hackathon2')
 
 
-def load_static_data(name: str) -> Dict[str, Dict[str, Any]]:
-    filename = os.path.join(DATAPATH, name + '.csv')
+def load_static_data(filename: str, modelkey: str = 'MODEL') -> Dict[str, Dict[str, Any]]:
+    filename = os.path.join(DATAPATH, filename)
 
     result = dict()
     with open(filename) as file:
-        reader = csv.DictReader(file)
-        for line in reader:
-            result[line['Name']] = dict(line)
+        if filename.endswith('.csv'):
+            reader = csv.DictReader(file)
+            for line in reader:
+                result[line[modelkey]] = dict(line)
+        elif filename.endswith('.json'):
+            result = json.load(file)
+        else:
+            raise ValueError("Invalid filename extension")
 
     return result
 
 
-BATTERIES = load_static_data('Battery')
-PROPELLERS = load_static_data('PropellerExt')
-WINGS = load_static_data('Wing')
-MOTORS = load_static_data('Motor')
+BATTERIES = load_static_data('Battery.csv')
+PROPELLERS = load_static_data('PropellerExt.csv')
+AERO_INFO = load_static_data('aero_info.json')
+MOTORS = load_static_data('Motor.csv')
 
 
-def find_rpm_minmax(propname: str) -> Tuple[float, float]:
-    filename = os.path.join(DATAPATH, "propeller", propname + ".dat")
+def find_rpm_minmax(perf_file: str) -> Tuple[float, float]:
+    filename = os.path.join(DATAPATH, "..", "prop_tables", perf_file)
     rpm_min = 1e10
     rpm_max = -1e10
     with open(filename, 'r') as file:
@@ -66,10 +71,10 @@ def create_extended_propeller_table():
     with open(filename, "w") as file:
         writer = None
 
-        for prop, data in PROPELLERS.items():
-            rpm_min, rpm_max = find_rpm_minmax(prop)
-            data["RPM Min"] = rpm_min
-            data["RPM Max"] = rpm_max
+        for data in PROPELLERS.values():
+            rpm_min, rpm_max = find_rpm_minmax(data['Performance_File'])
+            data["RPM_MIN"] = rpm_min
+            data["RPM_MAX"] = rpm_max
 
             if writer is None:
                 writer = csv.DictWriter(file, fieldnames=data.keys())
