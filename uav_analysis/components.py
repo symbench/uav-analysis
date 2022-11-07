@@ -44,8 +44,8 @@ def load_static_data(filename: str, modelkey: str = 'MODEL') -> Dict[str, Dict[s
 
 BATTERIES = load_static_data('Battery.csv')
 PROPELLERS = load_static_data('PropellerExt.csv')
-AERO_INFO = load_static_data('aero_info.json')
 MOTORS = load_static_data('Motor.csv')
+WINGS = load_static_data('aero_info.json')
 
 
 def find_rpm_minmax(perf_file: str) -> Tuple[float, float]:
@@ -65,8 +65,6 @@ def find_rpm_minmax(perf_file: str) -> Tuple[float, float]:
 
 
 def create_extended_propeller_table():
-    import csv
-
     filename = os.path.join(DATAPATH, "PropellerExt.csv")
     with open(filename, "w") as file:
         writer = None

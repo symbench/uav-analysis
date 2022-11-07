@@ -17,16 +17,12 @@
 import argparse
 import sys
 
-from . import bemp_combinations_hackathon1
-from . import bemp_fdm_generator_hackathon1
-from . import mass_properties_hackathon1
 from . import testbench_data
 from . import motor_propeller_analysis
 from . import battery_analysis
 from . import battery_analysis2
 from . import wing_analysis
 from . import aggregate_analysis
-from . import mass_properties_hackathon2
 from . import napkin_calculator
 from . import symbolic_propeller
 
@@ -36,9 +32,6 @@ def run():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('command', metavar="COMMAND", help=", ".join(sorted([
         "testbench-data",
-        "mass-properties-hackathon1",
-        "bemp-combinations-hackathon1",
-        "bemp-fdm-generator-hackathon1",
         "motor-propeller-analysis",
         "motor-propeller-single",
         "battery-analysis",
@@ -57,12 +50,6 @@ def run():
 
     if args.command == 'testbench-data':
         testbench_data.run(args=sys.argv[2:])
-    elif args.command == 'mass-properties-hackathon1':
-        mass_properties_hackathon1.run(args=sys.argv[2:])
-    elif args.command == 'bemp-combinations-hackathon1':
-        bemp_combinations_hackathon1.run(args=sys.argv[2:])
-    elif args.command == 'bemp-fdm-generator-hackathon1':
-        bemp_fdm_generator_hackathon1.run(args=sys.argv[2:])
     elif args.command == 'motor-propeller-analysis':
         motor_propeller_analysis.run(args=sys.argv[2:])
     elif args.command == 'motor-propeller-single':
@@ -77,8 +64,6 @@ def run():
         aggregate_analysis.run(args=sys.argv[2:])
     elif args.command == 'napkin-calculator':
         napkin_calculator.run(args=sys.argv[2:])
-    elif args.command == 'mass-properties-hackathon2':
-        mass_properties_hackathon2.run()  # params not wired yet
     elif args.command == 'symbolic-propeller':
         symbolic_propeller.run(args=sys.argv[2:])
     else:
