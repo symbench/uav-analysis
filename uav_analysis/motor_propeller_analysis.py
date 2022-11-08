@@ -107,8 +107,8 @@ def parse_fdm_output(fdm_output: str) -> Optional[Dict[str, float]]:
                 continue
             elif line.startswith(" Max Volt  1"):
                 linetype = "MaxVolt."
-            # elif line.startswith(" MV @40m/s 1"):
-            #     linetype = "MaxVolt_at40."
+            elif line.startswith(" Max 40m/s 1"):
+                linetype = "MaxAt40."
             elif line.startswith(" Max Power 1"):
                 linetype = "MaxPower."
             elif line.startswith(" Max Amps  1"):
@@ -152,9 +152,9 @@ def create_single_datapoint(motor: Dict[str, Any],
     result["current"] = output_data["MaxVolt.Current"]     # A
     result["net_thrust"] = result["thrust"] - 9.81 * result["weight"]  # N
 
-    # result["thrust_at40"] = output_data["MaxVolt_at40.Thrust"]
-    # result["power_at40"] = output_data["MaxVolt_at40.Power"]
-    # result["current_at40"] = output_data["MaxVolt_at40.Current"]
+    result["thrust_at40"] = output_data.get("MaxAt40.Thrust", math.nan)
+    result["power_at40"] = output_data.get("MaxAt40.Power", math.nan)
+    result["current_at40"] = output_data.get("MaxAt40.Current", math.nan)
 
     if output_data['MaxPower.Power'] < output_data['MaxAmps.Power']:
         result["max_omega_rpm"] = output_data["MaxPower.OmegaRpm"]
@@ -175,6 +175,11 @@ def create_single_datapoint(motor: Dict[str, Any],
     result["power_per_weight"] = result["power"] / result["weight"]
     result["thrust_per_power"] = result["thrust"] / result["power"]
     result["net_thrust_per_power"] = result["net_thrust"] / result["power"]
+
+    result["thrust_per_weight_at40"] = result["thrust_at40"] / result["weight"]
+    result["power_per_weight_at40"] = result["power_at40"] / result["weight"]
+    result["thrust_per_power_at40"] = result["thrust_at40"] / \
+        result["power_at40"] if result["power_at40"] != 0 else math.nan
 
     return result
 
@@ -232,6 +237,10 @@ def motor_propeller_generator(select_motor: Optional[str], select_propeller: Opt
     for motor in MOTORS:
         if select_motor and motor != select_motor:
             continue
+        if float(MOTORS[motor]['MAX_POWER']) <= 0.0:
+            print("WARNING: invalid MAX_POWER for", motor)
+            continue
+
         for propeller in PROPELLERS:
             if select_propeller and propeller != select_propeller:
                 continue
@@ -293,7 +302,7 @@ def run_single(args=None):
                         metavar='DIR', help="path to propeller data directory")
     parser.add_argument('--fdm',
                         default=os.path.relpath(os.path.join(
-                            DATAPATH, '..', '..', 'flight-dynamics-model', 'bin', 'new_fdm')),
+                            DATAPATH, '..', '..', 'flight-dynamics-model', 'bin', 'new_fdm_step0')),
                         metavar='PATH', help="path to fdm executable")
     parser.add_argument('motor', metavar='MOTOR', help='motor name')
     parser.add_argument('propeller', metavar='PROPELLER',
@@ -345,7 +354,7 @@ def run(args=None):
                         help="do not use propeller table min/max RPM limits")
     parser.add_argument('--fdm',
                         default=os.path.relpath(os.path.join(
-                            DATAPATH, '..', '..', 'flight-dynamics-model', 'bin', 'new_fdm')),
+                            DATAPATH, '..', '..', 'flight-dynamics-model', 'bin', 'new_fdm_step0')),
                         metavar='PATH', help="path to fdm executable")
     parser.add_argument('--propeller', metavar='NAME',
                         help='limits the search space to this propeller')
