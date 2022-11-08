@@ -25,7 +25,7 @@ DATAPATH = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                         'data_hackathon2')
 
 
-def load_static_data(filename: str, modelkey: str = 'MODEL') -> Dict[str, Dict[str, Any]]:
+def load_static_data(filename: str, modelkey: str = 'MODEL_NAME') -> Dict[str, Dict[str, Any]]:
     filename = os.path.join(DATAPATH, filename)
 
     result = dict()
@@ -78,18 +78,6 @@ def create_extended_propeller_table():
                 writer = csv.DictWriter(file, fieldnames=data.keys())
                 writer.writeheader()
             writer.writerow(data)
-
-
-def get_bemp_data(battery: str, motor: str, propeller: str) -> Dict[str, float]:
-    data = dict()
-    if battery is not None:
-        for key, val in BATTERIES[battery].items():
-            data['Battery.' + key] = val
-    for key, val in MOTORS[motor].items():
-        data['Motor.' + key] = val
-    for key, val in PROPELLERS[propeller].items():
-        data['Propeller.' + key] = val
-    return data
 
 
 if __name__ == '__main__':
