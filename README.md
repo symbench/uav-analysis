@@ -21,7 +21,7 @@
   maximum and minimum RPM values.
 * Used `uav-analysis motor-propeller-analysis` to generate the `motor_propeller_analysis.csv` file
   containing all performance data for all combinations of motors, propellers and battery voltages.
-  We also generate performance data at 40 m/s air (crusing) speed. Used `constraint-prog pareto-front --neg weight power --pos thrust --save motor_propeller_analysis_pareto.csv motor_propeller_analysis.csv` to find one possible pareto front, and saved it into the
-  `data_hackathon2` folder. For some reason the at 40 m/s values seem to be off, so we do not 
-  use them for now.
+  We also generate performance data at 20 m/s air (crusing) speed. Used
+  `constraint-prog pareto-front --max weight 0.2 --min thrust_at20 5.0 --neg weight power_at20 --pos thrust_at20 --save motor_propeller_analysis_pareto.csv motor_propeller_analysis.csv` 
+  to find one possible pareto front, and saved it into the `data_hackathon2` folder.
   

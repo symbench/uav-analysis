@@ -48,20 +48,22 @@ MOTORS = load_static_data('MotorFix.csv')
 WINGS = load_static_data('aero_info.json')
 
 
-def find_rpm_minmax(perf_file: str) -> Tuple[float, float]:
+def find_rpm_j_minmax(perf_file: str) -> Tuple[float, float, float, float]:
     filename = os.path.join(DATAPATH, "..", "prop_tables", perf_file)
-    rpm_min = 1e10
-    rpm_max = -1e10
+    rpms = []
+    js = []
     with open(filename, 'r') as file:
         for line in file.readlines():
             line = line.strip()
             if line.startswith("PROP RPM = "):
                 rpm = float(line.split()[3])
                 if math.isfinite(rpm):
-                    rpm_min = min(rpm_min, rpm)
-                    rpm_max = max(rpm_max, rpm)
-    assert rpm_min != 1e10
-    return (rpm_min, rpm_max)
+                    rpms.append(rpm)
+            elif len(rpms) == 1 and line and line[:1].isdigit():
+                j = float(line.split()[1])
+                if math.isfinite(j):
+                    js.append(j)
+    return (min(rpms), max(rpms), min(js), max(js))
 
 
 def create_extended_propeller_table():
@@ -70,9 +72,12 @@ def create_extended_propeller_table():
         writer = None
 
         for data in PROPELLERS.values():
-            rpm_min, rpm_max = find_rpm_minmax(data['Performance_File'])
+            rpm_min, rpm_max, j_min, j_max = find_rpm_j_minmax(
+                data['Performance_File'])
             data["RPM_MIN"] = rpm_min
             data["RPM_MAX"] = rpm_max
+            data["J_MIN"] = j_min
+            data["J_MAX"] = j_max
 
             if writer is None:
                 writer = csv.DictWriter(file, fieldnames=data.keys())
@@ -81,4 +86,5 @@ def create_extended_propeller_table():
 
 
 if __name__ == '__main__':
+    # print(find_rpm_j_minmax("PER3_12x38SF.dat"))
     create_extended_propeller_table()
