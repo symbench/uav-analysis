@@ -144,7 +144,7 @@ def create_single_datapoint(motor: Dict[str, Any],
     result['propeller_rpm_max'] = float(propeller["RPM_MAX"])  # rpm
     result['propeller_rpm_min'] = float(propeller["RPM_MIN"])  # rpm
 
-    result["omega_rpm"] = output_data["MaxVolt.OmegaRpm"]  # rpm
+    result["omega"] = output_data["MaxVolt.OmegaRpm"]     # rpm
     result["voltage"] = output_data["MaxVolt.Voltage"]     # V
     result["thrust"] = output_data["MaxVolt.Thrust"]       # N
     result["torque"] = output_data["MaxVolt.Torque"]       # Nm
@@ -152,19 +152,20 @@ def create_single_datapoint(motor: Dict[str, Any],
     result["current"] = output_data["MaxVolt.Current"]     # A
     result["net_thrust"] = result["thrust"] - 9.81 * result["weight"]  # N
 
+    result["omega_at40"] = output_data.get("MaxAt40.OmegaRpm", math.nan)
     result["thrust_at40"] = output_data.get("MaxAt40.Thrust", math.nan)
     result["power_at40"] = output_data.get("MaxAt40.Power", math.nan)
     result["current_at40"] = output_data.get("MaxAt40.Current", math.nan)
 
     if output_data['MaxPower.Power'] < output_data['MaxAmps.Power']:
-        result["max_omega_rpm"] = output_data["MaxPower.OmegaRpm"]
+        result["max_omega"] = output_data["MaxPower.OmegaRpm"]
         result["max_voltage"] = output_data["MaxPower.Voltage"]
         result["max_thrust"] = output_data["MaxPower.Thrust"]
         result["max_torque"] = output_data["MaxPower.Torque"]
         result["max_power"] = output_data["MaxPower.Power"]
         result["max_current"] = output_data["MaxPower.Current"]
     else:
-        result["max_omega_rpm"] = output_data["MaxAmps.OmegaRpm"]
+        result["max_omega"] = output_data["MaxAmps.OmegaRpm"]
         result["max_voltage"] = output_data["MaxAmps.Voltage"]
         result["max_thrust"] = output_data["MaxAmps.Thrust"]
         result["max_torque"] = output_data["MaxAmps.Torque"]
@@ -213,16 +214,16 @@ def generate_multi_datapoints(
             break
 
         if rpm_limits:
-            if datapoint["max_omega_rpm"] < datapoint["propeller_rpm_min"]:
+            if datapoint["max_omega"] < datapoint["propeller_rpm_min"]:
                 break
 
-            if datapoint["omega_rpm"] > datapoint["propeller_rpm_max"]:
+            if datapoint["omega"] > datapoint["propeller_rpm_max"]:
                 break
 
-            if datapoint["omega_rpm"] < datapoint["propeller_rpm_min"]:
+            if datapoint["omega"] < datapoint["propeller_rpm_min"]:
                 continue
 
-        if min(datapoint["omega_rpm"], datapoint["voltage"],
+        if min(datapoint["omega"], datapoint["voltage"],
                datapoint["power"], datapoint["thrust"],
                datapoint["torque"], datapoint["current"]) < 0.0:
             continue

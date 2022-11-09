@@ -56,7 +56,7 @@ def find_rpm_minmax(perf_file: str) -> Tuple[float, float]:
         for line in file.readlines():
             line = line.strip()
             if line.startswith("PROP RPM = "):
-                rpm = rpm = float(line.split()[3])
+                rpm = float(line.split()[3])
                 if math.isfinite(rpm):
                     rpm_min = min(rpm_min, rpm)
                     rpm_max = max(rpm_max, rpm)
