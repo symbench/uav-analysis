@@ -44,7 +44,7 @@ def load_static_data(filename: str, modelkey: str = 'MODEL_NAME') -> Dict[str, D
 
 BATTERIES = load_static_data('Battery.csv')
 PROPELLERS = load_static_data('PropellerExt.csv')
-MOTORS = load_static_data('MotorFix.csv')
+MOTORS = load_static_data('Motor.csv')
 WINGS = load_static_data('aero_info.json')
 
 
