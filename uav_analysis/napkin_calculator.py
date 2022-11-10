@@ -22,6 +22,7 @@ import numpy
 import sympy
 
 from .components import BATTERIES, AERO_INFO
+from .wing_analysis import get_wing_thickness, get_wing_data, get_wing_weight
 
 from constraint_prog.point_cloud import PointCloud, PointFunc
 from constraint_prog.sympy_func import SympyFunc
@@ -97,9 +98,8 @@ class WingModel():
                  chord: Optional[float] = None,     # m
                  span: Optional[float] = None,      # m
                  prefix: str = "wing"):
-        assert len(naca_profile) == 4
         self.naca_profile = naca_profile
-        self.thickness = float(naca_profile[2:4])
+        self.thickness = get_wing_thickness(naca_profile)
         self.prefix = prefix
 
         if max_load is None:
@@ -114,11 +114,18 @@ class WingModel():
             span = sympy.Symbol(self.prefix + "_span")
         self.span = span
 
-        self.weight = WingModel.symbolic_wing_weight(
-            self.thickness, self.chord, self.span, self.max_load)
+        self.weight = get_wing_weight(
+            thickness=self.thickness,
+            chord1=self.chord,
+            chord2=self.chord,
+            span=self.span,
+            max_load=self.max_load)
 
-        self.wing_data = WingModel.get_wing_data(
-            naca_profile, self.chord, self.span)
+        self.wing_data = get_wing_data(
+            naca_profile=naca_profile,
+            chord1=self.chord,
+            chord2=self.chord,
+            span=self.span)
 
         self.surface_area = self.wing_data["surface_area"]
         self.min_angle = (self.wing_data["C_Lmin"] - self.wing_data["C_L0"]) / \
@@ -167,76 +174,6 @@ class WingModel():
         D = thickness/100*C
 
         return 1/6*span*(A*B+C*D+((A+C)*(B+D)))
-
-    @staticmethod
-    def symbolic_wing_weight(thickness: Any,    # ratio
-                             chord: Any,        # m
-                             span: Any,         # m
-                             max_load: Any,     # N
-                             ) -> Any:          # kg
-        chord = chord * 1000.0
-        span = span * 1000.0
-        chord1 = chord
-        chord2 = chord
-        mc = (chord1+chord2)/2   # mean chord
-        tr = 1.0                 # taper ratio
-
-        real_thick = (thickness/100)*mc
-        rho = 1329.53246
-        yield_strength = 4.413e+9 * 0.8 / 1.5
-        skin_thick = 0.15 / 1000
-        meter_width = real_thick/1000
-        meter_chord = mc/1000
-        meter_span = span/1000
-        s = meter_span*meter_chord
-        tc = thickness/100
-
-        max_moment = ((max_load / meter_span) * meter_span ** 2) / 2
-
-        t_beam = 1/2*(meter_width - ((yield_strength*meter_width*(yield_strength *
-                      meter_width ** 3 - 6*max_moment)) ** (1/4)/yield_strength ** 0.5))
-
-        volume = (meter_width ** 2 - (meter_width - 2*t_beam) ** 2) * meter_span
-        Mspar = volume*rho
-        Mrib = (((3.1*1.37*s*0.5)*(meter_chord*tc) ** 0.5) / (1+tr)) * \
-            ((1+tr+tr ** 2)+1.1*meter_chord*tc*(1+tr+tr ** 2+tr ** 3))
-        Mskin = 2*s*skin_thick*rho
-        Mwing = Mspar + Mskin + Mrib
-
-        return Mwing
-
-    @staticmethod
-    def get_wing_data(profile: str, chord: Any, span: Any):
-        wing_dict = AERO_INFO["NACA " + profile]
-        chord1 = chord
-        chord2 = chord
-
-        MC = (chord1 + chord2) / 2  # Mean chord
-        SA = MC * span  # Surface area = planform area
-        # TR = min([chord1, chord2]) / max([chord1, chord2])  # Taper ratio
-        TR = 1
-        AR = span ** 2 / SA  # aspect ratio, modified defintion for tapered wings
-        Hfun = 0.0524 * TR ** 4 - 0.15 * TR ** 3 + \
-            0.1659 * TR ** 2 - 0.0706 * TR + 0.0119
-        k = (1 + Hfun * AR) / (math.pi * AR)
-
-        dcl_daoa_slope = float(wing_dict["dCl_dAoA_Slope"])
-        aoa_l0 = float(wing_dict["AoA_L0"])
-        cl_max = float(wing_dict["CL_Max"])
-        cd_min = float(wing_dict["CD_Min"])
-
-        return {
-            "a": dcl_daoa_slope,
-            "C_L0": -dcl_daoa_slope * aoa_l0,
-            "C_Lmax": cl_max,
-            "C_Lmin": -cl_max,
-            "C_D0": cd_min,
-            "k": k,
-            "C_Dfp": 1,
-            "bias1": 1.0,
-            "bias2": 0.5,
-            "surface_area": SA,
-        }
 
 
 class LiftModel():
@@ -702,7 +639,7 @@ def test():
 
     # front_left_wing
     wing = WingModel(
-        naca_profile="0012",
+        naca_profile="NACA 0012",
         max_load=30,     # N
         chord=0.150,     # m
         span=0.450,      # m

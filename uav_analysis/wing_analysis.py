@@ -14,41 +14,51 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Any, List, Dict, Generator, Iterable
+from typing import Any, List, Dict, Union, Generator, Iterable
 
 import sys
 import csv
 import math
 import os
 import re
+import sympy
 
-from .components import AERO_INFO
-
-
-NACA_PROFILE = re.compile(r"^NACA (\d)(\d)(\d\d)$")
+from .components import DATAPATH, AERO_INFO
 
 
-def calc_wing_data(profile: str, chord1: float, chord2: float,
-                   span: float) -> Dict[str, float]:
+NACA_PROFILE = re.compile(r"^NACA \d\d(\d\d)$")
+
+
+def get_wing_thickness(naca_profile: str) -> int:
+    match = NACA_PROFILE.match(naca_profile)
+    assert match
+    return int(match.group(1))
+
+
+def get_wing_data(naca_profile: str,
+                  chord1: Union[float, sympy.Expr],  # m
+                  chord2: Union[float, sympy.Expr],  # m
+                  span: Union[float, sympy.Expr],    # m
+                  ) -> Dict[str, Union[float, sympy.Expr]]:
     """ Copied from run_fd_calc.py """
-    wing_dict = AERO_INFO[profile]
+    match = NACA_PROFILE.match(naca_profile)
+    assert match
+    wing_dict = AERO_INFO[naca_profile]
 
     MC = (chord1 + chord2) / 2  # Mean chord
     SA = MC * span  # Surface area = planform area
-    TR = min([chord1, chord2]) / max([chord1, chord2])  # Taper ratio
+    TR = sympy.Min(chord1, chord2) / sympy.Max(chord1, chord2)  # Taper ratio
     AR = span ** 2 / SA  # aspect ratio, modified defintion for tapered wings
     Hfun = 0.0524 * TR ** 4 - 0.15 * TR ** 3 + \
         0.1659 * TR ** 2 - 0.0706 * TR + 0.0119
     k = (1 + Hfun * AR) / (math.pi * AR)
 
-    surface_area = (chord1 + chord2) / 2 * span
-    dcl_daoa_slope = float(wing_dict["dCl/dAoA Slope [1/deg.]"])
-    aoa_l0 = float(wing_dict["AoA @ L0 [deg.]"])
-    cl_max = float(wing_dict["CL Max"])
-    cd_min = float(wing_dict["CD Min"])
+    dcl_daoa_slope = float(wing_dict["dCl_dAoA_Slope"])
+    aoa_l0 = float(wing_dict["AoA_L0"])
+    cl_max = float(wing_dict["CL_Max"])
+    cd_min = float(wing_dict["CD_Min"])
 
     return {
-        "surface_area": surface_area,
         "a": dcl_daoa_slope,
         "C_L0": -dcl_daoa_slope * aoa_l0,
         "C_Lmax": cl_max,
@@ -58,23 +68,85 @@ def calc_wing_data(profile: str, chord1: float, chord2: float,
         "C_Dfp": 1,
         "bias1": 1.0,
         "bias2": 0.5,
+        "surface_area": SA,
     }
 
 
-def generate_fdm_input(wing_data: Dict[str, float]) -> str:
+def get_wing_weight(thickness: float,
+                    chord1: Union[float, sympy.Expr],    # m
+                    chord2: Union[float, sympy.Expr],    # m
+                    span: Union[float, sympy.Expr],      # m
+                    max_load: Union[float, sympy.Expr],  # N
+                    ) -> Union[float, sympy.Expr]:       # kg
+    chord1 = chord1 * 1000
+    chord2 = chord2 * 1000
+    span = span * 1000
+    root_chord = sympy.Max(chord1, chord2)
+    tip_chord = sympy.Min(chord1, chord2)
+    TR = tip_chord / root_chord
+    MC = (chord1+chord2)/2
+
+    """ Extracted from Creo models (Tools/Relations) """
+    real_thick = (thickness/100)*MC
+    rho = 1329.53246
+    yield_strength = 4.413e+9 * 0.8 / 1.5
+    skin_thick = 0.15 / 1000
+    meter_width = real_thick/1000
+    meter_chord = MC/1000
+    meter_span = span/1000
+    S = meter_span*meter_chord
+    TC = thickness/100
+
+    max_moment = ((max_load / meter_span) * meter_span ** 2) / 2
+
+    t_beam = 1/2*(meter_width - ((yield_strength*meter_width*(yield_strength *
+                  meter_width ** 3 - 6 * max_moment)) ** (1/4) / yield_strength ** 0.5))
+
+    volume = (meter_width ** 2 - (meter_width - 2 * t_beam) ** 2) * meter_span
+    Mspar = volume*rho
+    Mrib = (((3.1 * 1.37 * S * 0.5) * (meter_chord * TC) ** 0.5) / (1 + TR)) * \
+        ((1 + TR + TR ** 2) + 1.1 * meter_chord*TC*(1 + TR+TR ** 2 + TR ** 3))
+    Mskin = 2*S*skin_thick*rho
+    Mwing = Mspar + Mskin + Mrib
+
+    return Mwing
+
+
+def get_wing_volume(naca_profile: str,
+                    chord1: float,  # m
+                    chord2: float,  # m
+                    span: float,    # m
+                    ) -> float:     # m^3
+    """ Copied from run_fd_calc.py for battery packing """
+    thickness = get_wing_thickness(naca_profile)
+
+    # it does not matter, which one is which
+    root_chord = chord1
+    tip_chord = chord2
+    A = root_chord/2
+    B = thickness/100*A
+    C = tip_chord/2
+    D = thickness/100*C
+
+    available_volume = 1/6*span*(A*B+C*D+((A+C)*(B+D)))
+
+    return available_volume
+
+
+def generate_fdm_input(wing_data: Dict[str, float],
+                       max_load: float,
+                       ) -> str:
     """
     Looking at the new_fdm.f fortran code, this is the bare minimum for lift
     and drag tables.
     """
 
     template = """&aircraft_data
-   aircraft%num_wings       = 2 ! M number of wings in aircraft
+   aircraft%num_wings       = 2
    aircraft%num_propellers  = 0
    aircraft%num_batteries   = 0
    aircraft%i_analysis_type = 0
 
-!   Wings
-!
 !  WING: (1)    Component Name: rear_right_wing
    wing(1)%surface_area   = {surface_area}
    wing(1)%a   = {a}
@@ -84,6 +156,9 @@ def generate_fdm_input(wing_data: Dict[str, float]) -> str:
    wing(1)%C_D0   = {C_D0}
    wing(1)%k   = {k}
    wing(1)%C_Dfp   = {C_Dfp}
+   wing(1)%max_load  = {max_load}
+   wing(1)%bias1   =  {bias1}
+   wing(1)%bias2   =  {bias2}
 !
 !  WING: (2)    Component Name: rear_left_wing
    wing(2)%surface_area   = {surface_area}
@@ -94,10 +169,25 @@ def generate_fdm_input(wing_data: Dict[str, float]) -> str:
    wing(2)%C_D0   = {C_D0}
    wing(2)%k   = {k}
    wing(2)%C_Dfp   = {C_Dfp}
+   wing(2)%max_load  = {max_load}
+   wing(2)%bias1   =  {bias1}
+   wing(2)%bias2   =  {bias2}
 
 /
 """
-    return template.format(**wing_data)
+    return template.format(
+        surface_area=wing_data["surface_area"] * 1e6,
+        a=wing_data["a"],
+        C_L0=wing_data["C_L0"],
+        C_Lmax=wing_data["C_Lmax"],
+        C_Lmin=wing_data["C_Lmin"],
+        C_D0=wing_data["C_D0"],
+        k=wing_data["k"],
+        C_Dfp=wing_data["C_Dfp"],
+        bias1=wing_data["bias1"],
+        bias2=wing_data["bias2"],
+        max_load=max_load,
+    )
 
 
 def run_new_fdm(fdm_binary: str, fdm_input: str) -> str:
@@ -174,64 +264,6 @@ def parse_fdm_output(fdm_output: str, target_speed: float = 50.0) -> List[Dict[s
     return result
 
 
-def calc_geom_data(profile: str, chord1: float, chord2: float,
-                   span: float) -> Dict[str, float]:
-    """ Copied from run_fd_calc.py for battery packing """
-
-    match = NACA_PROFILE.match(profile)
-    assert match
-    thickness = float(match.group(3))
-
-    root_chord = max([chord1, chord2])
-    tip_chord = min([chord1, chord2])
-    A = root_chord/2
-    B = thickness/100*A
-    C = tip_chord/2
-    D = thickness/100*C
-
-    available_volume = 1/6*span*(A*B+C*D+((A+C)*(B+D)))
-
-    return {
-        "available_volume": available_volume * 1e-9,    # mm^3
-    }
-
-
-def calc_weight_data(profile: str, chord1: float, chord2: float,
-                     span: float, max_load: float) -> Dict[str, float]:
-    """ Extracted from Creo models (Tools/Relations) """
-
-    match = NACA_PROFILE.match(profile)
-    assert match
-    thickness = float(match.group(3))
-
-    taper_offset = 0  # assuming no taper offset
-
-    N = 1.5  # safety factor
-    VE = 50  # max airspeed
-    s = (chord1 + chord2) / 2 * span  # plan form area with taper accounted for
-    ar = span ** 2 / s  # aspect ratio assuming non-constant chord wing
-    sa = math.atan(abs(chord1 - chord2) * taper_offset / span)  # weep angle
-    mc = (chord1 + chord2) / 2  # mean chord
-    tr = chord2 / chord1  # taper ratio
-    weight = (
-        0.4536
-        * 96.948
-        * (
-            (max_load * 0.225 * N / (10 ** 5)) ** 0.65
-            * (ar / math.cos(sa)) ** 0.57
-            * (s / (100 * 92903)) ** 0.61
-            * ((1 + (1 / tr)) / (2 * thickness / 100)) ** 0.36
-            * (1 + (VE * 1.944 / 500)) ** 0.5
-        )
-        ** 0.993
-    )
-
-    return {
-        "max_load": max_load,  # N
-        "weight": weight,      # kg
-    }
-
-
 def combination_generator(
     profiles: Iterable[str],
     chords: Iterable[float],
@@ -257,21 +289,35 @@ def datapoint_generator(
         combinations: Iterable[Dict[str, Any]]
 ) -> Generator[Dict[str, Any], None, None]:
     for comb in combinations:
-        wing_data = calc_wing_data(
-            comb["profile"], comb["chord"], comb["chord"], comb["span"])
-        geom_data = calc_geom_data(
-            comb["profile"], comb["chord"], comb["chord"], comb["span"])
-        weight_data = calc_weight_data(
-            comb["profile"], comb["chord"], comb["chord"], comb["span"],
+        thickness = get_wing_thickness(comb["profile"])
+        wing_data = get_wing_data(
+            comb["profile"],
+            comb["chord"],
+            comb["chord"],
+            comb["span"])
+        wing_weight = get_wing_weight(
+            thickness,
+            comb["chord"],
+            comb["chord"],
+            comb["span"],
             comb["max_load"])
-        fdm_input = generate_fdm_input(wing_data)
+        wing_volume = get_wing_volume(
+            comb["profile"],
+            comb["chord"],
+            comb["chord"],
+            comb["span"])
+        fdm_input = generate_fdm_input(wing_data, max_load=comb["max_load"])
         fdm_output = run_new_fdm(fdm_binary, fdm_input)
         lift_drags = parse_fdm_output(fdm_output, target_speed)
         for lift_drag in lift_drags:
             if lift_drag["flight_load"] * load_safety < comb["max_load"]:
                 lift_per_drag = lift_drag["lift"] / lift_drag["drag"]
-                yield {**comb, **lift_drag, **geom_data, **weight_data,
-                       "lift_per_drag": lift_per_drag}
+                yield {**comb,
+                       **lift_drag,
+                       "wing_weight": wing_weight,
+                       "wing_volume": wing_volume,
+                       "lift_per_drag": lift_per_drag,
+                       }
 
 
 def run(args=None):
@@ -283,8 +329,9 @@ def run(args=None):
                         default='wing_analysis.csv',
                         help="output file name")
     parser.add_argument('--fdm',
-                        default='new_fdm', metavar='PATH',
-                        help="path to the new_fdm executable")
+                        default=os.path.relpath(os.path.join(
+                            DATAPATH, '..', '..', 'flight-dynamics-model', 'bin', 'new_fdm_step0')),
+                        metavar='PATH', help="path to fdm executable")
     parser.add_argument('--speed', type=float, default=50.0,
                         help='change the target speed')
     parser.add_argument('--naca', metavar='DDDD',
@@ -310,26 +357,25 @@ def run(args=None):
     if args.chord is not None:
         chords = [args.chord]
     else:
-        chords = range(600, 2200, 200)
+        chords = [cm * 0.01 for cm in range(5, 55, 5)]
 
     if args.span is not None:
         spans = [args.span]
     else:
-        spans = range(6000, 10500, 500)
+        spans = [cm * 0.01 for cm in range(20, 160, 10)]
 
     if args.max_load is not None:
         max_loads = [args.max_load]
     else:
-        max_loads = range(5000, 9000, 1000)
+        max_loads = [n for n in range(30, 110, 10)]
 
-    total = len(profiles) * len(chords) * len(spans) * len(max_loads) * 41
     if args.info:
         print("profiles:", ", ".join(profiles))
         print("chords:", ", ".join(map(str, chords)))
         print("spans:", ", ".join(map(str, spans)))
         print("max_loads:", ", ".join(map(str, max_loads)))
-        print("target speed:", str(args.speed) + ", number of angles: 21")
-        print("TOTAL:", total, "data points")
+        print("target speed:", str(args.speed))
+        print("number of angles: 21")
         return
 
     combinations = combination_generator(profiles, chords, spans, max_loads)
@@ -340,19 +386,21 @@ def run(args=None):
         combinations=combinations)
 
     with open(args.output, 'w', newline='') as file:
-        row = next(datapoints)
-        writer = csv.DictWriter(file, row.keys())
-        writer.writeheader()
-        writer.writerow(row)
-        cnt = 0
+        writer = None
+        count = 0
+
         for row in datapoints:
+            if writer is None:
+                writer = csv.DictWriter(file, row.keys())
+                writer.writeheader()
             writer.writerow(row)
-            if cnt % 1000 == 0:
-                sys.stdout.write('\r')
-                sys.stdout.write("{:10.2f}%".format(100 * cnt / total))
+            if count % 1000 == 0:
+                sys.stdout.write("\rGenerated: {}".format(count))
                 sys.stdout.flush()
-            cnt += 1
-        print("\nDone")
+            count += 1
+
+    sys.stdout.write("\rGenerated: {}".format(count))
+    print("\nResults saved to", args.output)
 
 
 if __name__ == '__main__':

@@ -38,7 +38,6 @@ def run():
         "battery-analysis2",
         "wing-analysis",
         "aggregate-analysis",
-        "mass-properties-hackathon2",
         "napkin-calculator",
         "symbolic-propeller",
     ])))
