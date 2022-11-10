@@ -22,7 +22,7 @@ import math
 import os
 import re
 
-from .components import WINGS
+from .components import AERO_INFO
 
 
 NACA_PROFILE = re.compile(r"^NACA (\d)(\d)(\d\d)$")
@@ -31,7 +31,7 @@ NACA_PROFILE = re.compile(r"^NACA (\d)(\d)(\d\d)$")
 def calc_wing_data(profile: str, chord1: float, chord2: float,
                    span: float) -> Dict[str, float]:
     """ Copied from run_fd_calc.py """
-    wing_dict = WINGS[profile]
+    wing_dict = AERO_INFO[profile]
 
     MC = (chord1 + chord2) / 2  # Mean chord
     SA = MC * span  # Surface area = planform area
@@ -305,7 +305,7 @@ def run(args=None):
         assert len(args.naca) == 4
         profiles = ["NACA " + args.naca]
     else:
-        profiles = list(WINGS.keys())
+        profiles = list(AERO_INFO.keys())
 
     if args.chord is not None:
         chords = [args.chord]

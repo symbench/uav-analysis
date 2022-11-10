@@ -45,7 +45,7 @@ def load_static_data(filename: str, modelkey: str = 'MODEL_NAME') -> Dict[str, D
 BATTERIES = load_static_data('Battery.csv')
 PROPELLERS = load_static_data('PropellerExt.csv')
 MOTORS = load_static_data('Motor.csv')
-WINGS = load_static_data('aero_info.json')
+AERO_INFO = load_static_data('aero_info.json')
 
 
 def find_rpm_j_minmax(perf_file: str) -> Tuple[float, float, float, float]:
