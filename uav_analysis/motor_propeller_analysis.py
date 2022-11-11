@@ -154,7 +154,6 @@ def create_single_datapoint(motor: Dict[str, Any],
     result["torque"] = output_data["MaxVolt.Torque"]       # Nm
     result["power"] = output_data["MaxVolt.Power"]         # W
     result["current"] = output_data["MaxVolt.Current"]     # A
-    result["net_thrust"] = result["thrust"] - 9.81 * result["weight"]  # N
 
     result["omega_rpm_at20"] = output_data.get("MaxAt20.OmegaRpm", math.nan)
     result["thrust_at20"] = output_data.get("MaxAt20.Thrust", math.nan)
@@ -163,25 +162,13 @@ def create_single_datapoint(motor: Dict[str, Any],
     result["j_at20"] = 20.0 / \
         (result["omega_rpm_at20"] / 60.0 * result['propeller_diameter'])
 
-    if output_data['MaxPower.Power'] < output_data['MaxAmps.Power']:
-        result["max_omega_rpm"] = output_data["MaxPower.OmegaRpm"]
-        result["max_voltage"] = output_data["MaxPower.Voltage"]
-        result["max_thrust"] = output_data["MaxPower.Thrust"]
-        result["max_torque"] = output_data["MaxPower.Torque"]
-        result["max_power"] = output_data["MaxPower.Power"]
-        result["max_current"] = output_data["MaxPower.Current"]
-    else:
-        result["max_omega_rpm"] = output_data["MaxAmps.OmegaRpm"]
-        result["max_voltage"] = output_data["MaxAmps.Voltage"]
-        result["max_thrust"] = output_data["MaxAmps.Thrust"]
-        result["max_torque"] = output_data["MaxAmps.Torque"]
-        result["max_power"] = output_data["MaxAmps.Power"]
-        result["max_current"] = output_data["MaxAmps.Current"]
+    # the other values (the thrust) are not reliable
+    result["max_voltage"] = min(output_data["MaxPower.Voltage"],
+                                output_data["MaxAmps.Voltage"])
 
     result["thrust_per_weight"] = result["thrust"] / result["weight"]
     result["power_per_weight"] = result["power"] / result["weight"]
     result["thrust_per_power"] = result["thrust"] / result["power"]
-    result["net_thrust_per_power"] = result["net_thrust"] / result["power"]
 
     result["thrust_per_weight_at20"] = result["thrust_at20"] / result["weight"]
     result["power_per_weight_at20"] = result["power_at20"] / result["weight"]
@@ -221,9 +208,6 @@ def generate_multi_datapoints(
             break
 
         if rpm_limits:
-            if datapoint["max_omega_rpm"] < datapoint["propeller_rpm_min"]:
-                break
-
             if datapoint["omega_rpm"] > datapoint["propeller_rpm_max"]:
                 break
 
@@ -357,6 +341,99 @@ def run_single(args=None):
     datapoint = create_single_datapoint(motor, propeller, output_data)
 
     print(json.dumps(datapoint, indent=2))
+
+
+def approximate_motor_propeller(motor: str,
+                                propeller: str,
+                                propdata: str,
+                                fdm: str,
+                                ) -> Dict[str, Any]:
+    motor = MOTORS[motor]
+    propeller = PROPELLERS[propeller]
+
+    motor_rw = float(motor["INTERNAL_RESISTANCE"]) * 0.001  # Ohm
+    motor_i_idle = float(motor["IO_IDLE_CURRENT_10V"])      # A
+    min_voltage = motor_rw * motor_i_idle + 0.01  # guard value
+
+    fdm_input = generate_fdm_input(
+        motor, propeller, min_voltage, propdata)
+    fdm_output = run_new_fdm(
+        fdm_binary=fdm,
+        fdm_input=fdm_input)
+    output_data = parse_fdm_output(fdm_output)
+    min_datapoint = create_single_datapoint(motor, propeller, output_data)
+
+    max_voltage = min_datapoint["max_voltage"] - 0.01  # guard value
+    med_voltage = (min_voltage + max_voltage) * 0.5
+
+    fdm_input = generate_fdm_input(
+        motor, propeller, med_voltage, propdata)
+    fdm_output = run_new_fdm(
+        fdm_binary=fdm,
+        fdm_input=fdm_input)
+    output_data = parse_fdm_output(fdm_output)
+    med_datapoint = create_single_datapoint(motor, propeller, output_data)
+
+    fdm_input = generate_fdm_input(
+        motor, propeller, max_voltage, propdata)
+    fdm_output = run_new_fdm(
+        fdm_binary=fdm,
+        fdm_input=fdm_input)
+    output_data = parse_fdm_output(fdm_output)
+    max_datapoint = create_single_datapoint(motor, propeller, output_data)
+    # print(fdm_output)
+
+    return {
+        "motor_name": min_datapoint["motor_name"],
+        "propeller_name": min_datapoint["propeller_name"],
+        "weight": min_datapoint["weight"],
+        "min_voltage": min_voltage,
+        "min_omega_rpm": min_datapoint["omega_rpm"],
+        "min_thrust": min_datapoint["thrust"],
+        "min_power": min_datapoint["power"],
+        "min_current": min_datapoint["current"],
+        "med_voltage": med_voltage,
+        "med_omega_rpm": med_datapoint["omega_rpm"],
+        "med_thrust": med_datapoint["thrust"],
+        "med_power": med_datapoint["power"],
+        "med_current": med_datapoint["current"],
+        "max_voltage": max_voltage,
+        "max_omega_rpm": max_datapoint["omega_rpm"],
+        "max_thrust": max_datapoint["thrust"],
+        "max_power": max_datapoint["power"],
+        "max_current": max_datapoint["current"],
+    }
+
+
+def run_approximate(args=None):
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--propdata',
+                        default=os.path.relpath(
+                            os.path.join(DATAPATH, '..', 'prop_tables')),
+                        metavar='DIR', help="path to propeller data directory")
+    parser.add_argument('--fdm',
+                        default=os.path.relpath(os.path.join(
+                            DATAPATH, '..', '..', 'flight-dynamics-model', 'bin', 'new_fdm_step0')),
+                        metavar='PATH', help="path to fdm executable")
+    parser.add_argument('motor', metavar='MOTOR', help='motor name')
+    parser.add_argument('propeller', metavar='PROPELLER',
+                        help='propeller name')
+
+    args = parser.parse_args(args)
+
+    if args.motor not in MOTORS:
+        raise ValueError("invalid motor name")
+
+    if args.propeller not in PROPELLERS:
+        raise ValueError("invalid propeller name")
+
+    data = approximate_motor_propeller(
+        args.motor, args.propeller, args.propdata, args.fdm)
+    print(json.dumps(data, indent=2))
 
 
 def run(args=None):

@@ -43,9 +43,9 @@ class BatteryModel():
         self.battery_name = battery_name
         self.prefix = prefix
 
-        single_max_voltage = float(battery["VOLTAGE"])          # V
-        single_capacity = float(battery["CAPACITY"]) * 1e-3     # Ah
-        single_weight = float(battery["WEIGHT"])                # kg
+        single_max_voltage = float(battery["VOLTAGE"])      # V
+        single_capacity = float(battery["CAPACITY"]) * 3.6  # As (from mAh)
+        single_weight = float(battery["WEIGHT"])            # kg
         single_volume = float(battery["LENGTH"]) \
             * float(battery["WIDTH"]) \
             * float(battery["THICKNESS"]) * 1e-9                # m^3
@@ -94,7 +94,7 @@ class BatteryModel():
 class WingModel():
     def __init__(self,
                  naca_profile: str,
-                 max_load: Optional[float] = None,  # unit?
+                 max_load: Optional[float] = None,  # N
                  chord: Optional[float] = None,     # m
                  span: Optional[float] = None,      # m
                  prefix: str = "wing"):
@@ -163,18 +163,6 @@ class WingModel():
             del report[var]
         return report
 
-    @staticmethod
-    def symbolic_available_volume(thickness: Any, chord: Any, span: Any) -> Any:
-        root_chord = chord
-        tip_chord = chord
-
-        A = root_chord/2
-        B = thickness/100*A
-        C = tip_chord/2
-        D = thickness/100*C
-
-        return 1/6*span*(A*B+C*D+((A+C)*(B+D)))
-
 
 class LiftModel():
     def __init__(self,
@@ -212,9 +200,9 @@ class LiftModel():
         bounds = dict()
 
         if isinstance(self.speed, sympy.Symbol):
-            bounds[self.speed.name] = (0.0, 2 * 50.0)
+            bounds[self.speed.name] = (1.0, 50.0)
         else:
-            assert 0 <= self.speed <= 2 * 50.0
+            assert 0.0 <= self.speed <= 50.0
 
         if isinstance(self.angle, sympy.Symbol):
             bounds[self.angle.name] = (self.min_angle, self.max_angle)
@@ -243,50 +231,30 @@ class LiftModel():
 
 
 class MotorPropModel():
-    def __init__(self,
-                 motor_name: str,
-                 propeller_name: str,
-                 weight: float,
-                 voltage0: float,
-                 current0: float,
-                 thrust0: float,
-                 voltage1: float,
-                 current1: float,
-                 thrust1: float,
-                 voltage2: float,
-                 current2: float,
-                 thrust2: float,
-                 min_voltage: Optional[float] = None,
-                 max_voltage: Optional[float] = None):
-        assert voltage0 < voltage1 < voltage2
-        assert current0 < current1 < current2
-        assert thrust0 < thrust1 < thrust2
+    def __init__(self, approx_data: Dict[str, Any]):
 
-        self.motor_name = motor_name
-        self.propeller_name = propeller_name
-        self.weight = weight
+        self.motor_name = approx_data["motor_name"]
+        self.propeller_name = approx_data["propeller_name"]
+        self.weight = approx_data["weight"]
 
-        self.voltage0 = voltage0
-        self.current0 = current0
-        self.thrust0 = thrust0
+        self.voltage0 = approx_data["min_voltage"]
+        self.current0 = approx_data["min_current"]
+        self.thrust0 = approx_data["min_thrust"]
 
-        self.voltage1 = voltage1
-        self.current1 = current1
-        self.thrust1 = thrust1
+        self.voltage1 = approx_data["med_voltage"]
+        self.current1 = approx_data["med_current"]
+        self.thrust1 = approx_data["med_thrust"]
 
-        self.voltage2 = voltage2
-        self.current2 = current2
-        self.thrust2 = thrust2
+        self.voltage2 = approx_data["max_voltage"]
+        self.current2 = approx_data["max_current"]
+        self.thrust2 = approx_data["max_thrust"]
 
-        if min_voltage is None:
-            self.min_voltage = min(voltage0, voltage1, voltage2)
-        else:
-            self.min_voltage = min_voltage
+        assert self.voltage0 < self.voltage1 < self.voltage2
+        assert self.current0 <= self.current1 <= self.current2
+        assert self.thrust0 <= self.thrust1 <= self.thrust2
 
-        if max_voltage is None:
-            self.max_voltage = max(voltage0, voltage1, voltage2)
-        else:
-            self.max_voltage = max_voltage
+        self.min_voltage = self.voltage0
+        self.max_voltage = self.voltage2
 
     @staticmethod
     def quadratic_fit(
@@ -303,7 +271,7 @@ class MotorPropModel():
         b = numpy.array([y0, y1, y2])
 
         c = numpy.linalg.solve(a, b)
-        return c[0] + c[1] * x + c[2] * x ** 2
+        return float(c[0]) + float(c[1]) * x + float(c[2]) * x ** 2
 
     def get_current(self, voltage: Any) -> Any:
         return MotorPropModel.quadratic_fit(
@@ -367,7 +335,159 @@ class ThrustModel():
         return report
 
 
-def vudoo_napkin():
+def napkin2():
+    battery = BatteryModel(
+        battery_name="TurnigyGraphene6000mAh6S75C",
+        series_count=1,
+        parallel_count=2,
+    )
+    # print(battery.bounds())
+    # print(battery.report())
+
+    motor_prop_count = 4
+    motor_prop = MotorPropModel(
+        {
+            "motor_name": "t_motor_AntigravityMN4006KV380",
+            "propeller_name": "apc_propellers_12x6E",
+            "weight": 0.094988605,
+            "min_voltage": 0.0682,
+            "min_omega_rpm": 3.8,
+            "min_thrust": 0.0,
+            "min_power": 0.02,
+            "min_current": 0.32,
+            "med_voltage": 12.0191,
+            "med_omega_rpm": 4239.35,
+            "med_thrust": 4.64,
+            "med_power": 56.27,
+            "med_current": 4.68,
+            "max_voltage": 23.97,
+            "max_omega_rpm": 7940.89,
+            "max_thrust": 16.6,
+            "max_power": 399.66,
+            "max_current": 16.67
+        }
+    )
+
+    takeoff = ThrustModel(
+        motor_prop=motor_prop,
+        # voltage=battery.max_voltage,
+        min_voltage=motor_prop.min_voltage,
+        max_voltage=min(motor_prop.max_voltage, battery.max_voltage),
+        prefix="takeoff"
+    )
+    # print(takeoff.bounds())
+    # print(takeoff.report())
+
+    flight = ThrustModel(
+        motor_prop=motor_prop,
+        # voltage=battery.max_voltage,
+        min_voltage=motor_prop.min_voltage,
+        max_voltage=min(motor_prop.max_voltage, battery.max_voltage),
+        prefix="flight"
+    )
+    # print(flight.bounds())
+    # print(flight.report())
+
+    wing_count = 2
+    wing = WingModel(
+        naca_profile="NACA 0012",
+        max_load=30,       # N
+        # chord=0.150,     # m
+        # span=0.450,      # m
+        prefix="wing",
+    )
+    # print(wing.bounds())
+    # print(wing.report())
+
+    liftdrag = LiftModel(wing=wing,
+                         # speed=25.26121,
+                         # angle=10.0,
+                         prefix="liftdrag")
+    # print(liftdrag.bounds())
+    # print(liftdrag.report())
+
+    aircraft_weight = 2.5 + battery.weight \
+        + motor_prop_count * motor_prop.weight \
+        + wing_count * wing.weight                         # kg
+
+    takeoff_duration = 100.0                               # s
+    takeoff_capacity = takeoff.current * \
+        motor_prop_count * takeoff_duration                # As
+
+    flight_distance = 5100.0                               # m
+    flight_duration = flight_distance / liftdrag.speed     # s
+    flight_capacity = flight.current * \
+        motor_prop_count * flight_duration                 # As
+
+    bounds = {
+        **battery.bounds(),
+        **takeoff.bounds(),
+        **flight.bounds(),
+        **wing.bounds(),
+        **liftdrag.bounds(),
+    }
+
+    constraints = {
+        **liftdrag.equations(),
+        "equ_takeoff_current": battery.max_current >= takeoff.current * motor_prop_count,
+        "equ_takeoff_voltage": battery.max_voltage >= takeoff.voltage,
+        "equ_takeoff_thrust": takeoff.thrust * motor_prop_count >= aircraft_weight * GRAVITATION,
+        "equ_flight_current": battery.max_current >= flight.current * motor_prop_count,
+        "equ_flight_voltage": battery.max_voltage >= flight.voltage,
+        "equ_flight_lift": liftdrag.lift * wing_count >= aircraft_weight * GRAVITATION,
+        "equ_flight_drag": liftdrag.drag * wing_count <= flight.thrust * motor_prop_count,
+        "equ_total_capacity": battery.capacity * 0.8 >= takeoff_capacity + flight_capacity,
+    }
+
+    reports = {
+        **battery.report(),
+        **takeoff.report(),
+        **flight.report(),
+        **wing.report(),
+        **liftdrag.report(),
+        "motor_prop_count": motor_prop_count,
+        "wing_count": wing_count,
+        "aircraft_weight": aircraft_weight,
+        "takeoff_duration": takeoff_duration,
+        "takeoff_capacity": takeoff_capacity,
+        "flight_duration": flight_duration,
+        "flight_capacity": flight_capacity,
+    }
+
+    print("bounds:\n", bounds)
+    print("constraints:\n", constraints)
+    print("reports:\n", reports)
+
+    # generate random points
+    num = 5000
+    points = PointCloud.generate(bounds, num)
+    constraints_func = PointFunc(constraints)
+    reports_func = PointFunc(reports)
+
+    for step in range(10):
+        tol = [10.0, 1.0, 0.1, 0.01]
+        tol = tol[min(step, len(tol) - 1)]
+        points.add_mutations(tol, num)
+
+        points = points.newton_raphson(constraints_func, bounds, num_iter=10)
+        points = points.prune_by_tolerances(
+            constraints_func(points), tolerances=tol)
+
+        points = points.extend(reports_func(points, equs_as_float=False))
+        points = points.extend(constraints_func(points, equs_as_float=True))
+
+        if True:
+            points = points.prune_pareto_front2({
+                "liftdrag_speed": 1.0,
+                "aircraft_weight": -1.0,
+            })
+
+        print("step {} designs: {}".format(step, points.num_points))
+        if points.num_points:
+            print(json.dumps(points.row(0), indent=2, sort_keys=True))
+
+
+def napkin1():
     motor_prop_count = 8
     if False:
         motor_prop = MotorPropModel(
@@ -654,14 +774,17 @@ def run(args=None):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('design', choices=[
-        "vudoo",
+        "napkin1",
+        "napkin2",
         "plot-pareto-steps",
         "test",
     ])
     args = parser.parse_args(args)
 
-    if args.design == "vudoo":
-        vudoo_napkin()
+    if args.design == "napkin1":
+        napkin1()
+    elif args.design == "napkin2":
+        napkin2()
     elif args.design == "plot-pareto-steps":
         plot_pareto_steps()
     elif args.design == "test":

@@ -34,6 +34,7 @@ def run():
         "testbench-data",
         "motor-propeller-analysis",
         "motor-propeller-single",
+        "motor-propeller-approximate",
         "battery-analysis",
         "battery-analysis2",
         "wing-analysis",
@@ -53,6 +54,8 @@ def run():
         motor_propeller_analysis.run(args=sys.argv[2:])
     elif args.command == 'motor-propeller-single':
         motor_propeller_analysis.run_single(args=sys.argv[2:])
+    elif args.command == 'motor-propeller-approximate':
+        motor_propeller_analysis.run_approximate(args=sys.argv[2:])
     elif args.command == 'battery-analysis':
         battery_analysis.run(args=sys.argv[2:])
     elif args.command == 'battery-analysis2':
