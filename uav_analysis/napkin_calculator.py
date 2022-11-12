@@ -136,15 +136,15 @@ class WingModel():
     def bounds(self) -> Dict[str, Tuple[float, float]]:
         bounds = dict()
         if isinstance(self.max_load, sympy.Symbol):
-            bounds[self.max_load.name] = (0.0, 20000.0)
+            bounds[self.max_load.name] = (0.0, 500.0)
         if isinstance(self.chord, sympy.Symbol):
-            bounds[self.chord.name] = (0.1, 5.0)
+            bounds[self.chord.name] = (0.05, 2.0)
         else:
-            assert 0.1 <= self.chord <= 5.0
+            assert 0.05 <= self.chord <= 2.0
         if isinstance(self.span, sympy.Symbol):
-            bounds[self.span.name] = (0.1, 15.0)
+            bounds[self.span.name] = (0.05, 10.0)
         else:
-            assert 0.1 <= self.span <= 15.0
+            assert 0.05 <= self.span <= 10.0
         return bounds
 
     def report(self):
@@ -339,7 +339,7 @@ def napkin2():
     battery = BatteryModel(
         battery_name="TurnigyGraphene6000mAh6S75C",
         series_count=1,
-        parallel_count=2,
+        parallel_count=1,
     )
     # print(battery.bounds())
     # print(battery.report())
@@ -368,22 +368,22 @@ def napkin2():
         }
     )
 
-    takeoff = ThrustModel(
+    thrust_takeoff = ThrustModel(
         motor_prop=motor_prop,
         # voltage=battery.max_voltage,
-        min_voltage=motor_prop.min_voltage,
+        # min_voltage=motor_prop.min_voltage,
         max_voltage=min(motor_prop.max_voltage, battery.max_voltage),
-        prefix="takeoff"
+        prefix="thrust_takeoff"
     )
     # print(takeoff.bounds())
     # print(takeoff.report())
 
-    flight = ThrustModel(
+    thrust_flight = ThrustModel(
         motor_prop=motor_prop,
         # voltage=battery.max_voltage,
-        min_voltage=motor_prop.min_voltage,
+        # min_voltage=motor_prop.min_voltage,
         max_voltage=min(motor_prop.max_voltage, battery.max_voltage),
-        prefix="flight"
+        prefix="thrust_flight"
     )
     # print(flight.bounds())
     # print(flight.report())
@@ -391,7 +391,8 @@ def napkin2():
     wing_count = 2
     wing = WingModel(
         naca_profile="NACA 0012",
-        max_load=30,       # N
+        # max_load=30,       # N
+        # max_load=100,
         # chord=0.150,     # m
         # span=0.450,      # m
         prefix="wing",
@@ -399,10 +400,10 @@ def napkin2():
     # print(wing.bounds())
     # print(wing.report())
 
-    liftdrag = LiftModel(wing=wing,
-                         # speed=25.26121,
-                         # angle=10.0,
-                         prefix="liftdrag")
+    wing_flight = LiftModel(wing=wing,
+                            # speed=25.26121,
+                            # angle=10.0,
+                            prefix="wing_flight")
     # print(liftdrag.bounds())
     # print(liftdrag.report())
 
@@ -410,41 +411,45 @@ def napkin2():
         + motor_prop_count * motor_prop.weight \
         + wing_count * wing.weight                         # kg
 
+    aircraft_frontal_area = 0.057                          # m^2
+    aircraft_frontal_drag = 0.5 * AIR_DENSITY * \
+        aircraft_frontal_area * wing_flight.speed ** 2     # N
+
     takeoff_duration = 100.0                               # s
-    takeoff_capacity = takeoff.current * \
+    takeoff_capacity = thrust_takeoff.current * \
         motor_prop_count * takeoff_duration                # As
 
     flight_distance = 5100.0                               # m
-    flight_duration = flight_distance / liftdrag.speed     # s
-    flight_capacity = flight.current * \
+    flight_duration = flight_distance / wing_flight.speed  # s
+    flight_capacity = thrust_flight.current * \
         motor_prop_count * flight_duration                 # As
 
     bounds = {
         **battery.bounds(),
-        **takeoff.bounds(),
-        **flight.bounds(),
+        **thrust_takeoff.bounds(),
+        **thrust_flight.bounds(),
         **wing.bounds(),
-        **liftdrag.bounds(),
+        **wing_flight.bounds(),
     }
 
     constraints = {
-        **liftdrag.equations(),
-        "equ_takeoff_current": battery.max_current >= takeoff.current * motor_prop_count,
-        "equ_takeoff_voltage": battery.max_voltage >= takeoff.voltage,
-        "equ_takeoff_thrust": takeoff.thrust * motor_prop_count >= aircraft_weight * GRAVITATION,
-        "equ_flight_current": battery.max_current >= flight.current * motor_prop_count,
-        "equ_flight_voltage": battery.max_voltage >= flight.voltage,
-        "equ_flight_lift": liftdrag.lift * wing_count >= aircraft_weight * GRAVITATION,
-        "equ_flight_drag": liftdrag.drag * wing_count <= flight.thrust * motor_prop_count,
+        **wing_flight.equations(),
+        "equ_takeoff_current": battery.max_current >= thrust_takeoff.current * motor_prop_count,
+        "equ_takeoff_voltage": battery.max_voltage >= thrust_takeoff.voltage,
+        "equ_takeoff_thrust": thrust_takeoff.thrust * motor_prop_count >= aircraft_weight * GRAVITATION,
+        "equ_flight_current": battery.max_current >= thrust_flight.current * motor_prop_count,
+        "equ_flight_voltage": battery.max_voltage >= thrust_flight.voltage,
+        "equ_flight_lift": wing_flight.lift * wing_count >= aircraft_weight * GRAVITATION,
+        "equ_flight_drag": wing_flight.drag * wing_count + aircraft_frontal_drag <= thrust_flight.thrust * motor_prop_count,
         "equ_total_capacity": battery.capacity * 0.8 >= takeoff_capacity + flight_capacity,
     }
 
     reports = {
         **battery.report(),
-        **takeoff.report(),
-        **flight.report(),
+        **thrust_takeoff.report(),
+        **thrust_flight.report(),
         **wing.report(),
-        **liftdrag.report(),
+        **wing_flight.report(),
         "motor_prop_count": motor_prop_count,
         "wing_count": wing_count,
         "aircraft_weight": aircraft_weight,
@@ -478,13 +483,16 @@ def napkin2():
 
         if True:
             points = points.prune_pareto_front2({
-                "liftdrag_speed": 1.0,
+                "wing_flight_speed": 1.0,
                 "aircraft_weight": -1.0,
             })
 
         print("step {} designs: {}".format(step, points.num_points))
         if points.num_points:
             print(json.dumps(points.row(0), indent=2, sort_keys=True))
+
+    points.save("napkin2.csv")
+    points.plot2d("aircraft_weight", "wing_flight_speed")
 
 
 def napkin1():
