@@ -339,34 +339,58 @@ def napkin2():
     battery = BatteryModel(
         battery_name="TurnigyGraphene6000mAh6S75C",
         series_count=1,
-        parallel_count=1,
+        parallel_count=2,
     )
     # print(battery.bounds())
     # print(battery.report())
 
     motor_prop_count = 4
-    motor_prop = MotorPropModel(
-        {
-            "motor_name": "t_motor_AntigravityMN4006KV380",
-            "propeller_name": "apc_propellers_12x6E",
-            "weight": 0.094988605,
-            "min_voltage": 0.0682,
-            "min_omega_rpm": 3.8,
-            "min_thrust": 0.0,
-            "min_power": 0.02,
-            "min_current": 0.32,
-            "med_voltage": 12.0191,
-            "med_omega_rpm": 4239.35,
-            "med_thrust": 4.64,
-            "med_power": 56.27,
-            "med_current": 4.68,
-            "max_voltage": 23.97,
-            "max_omega_rpm": 7940.89,
-            "max_thrust": 16.6,
-            "max_power": 399.66,
-            "max_current": 16.67
-        }
-    )
+    if False:
+        motor_prop = MotorPropModel(
+            {
+                "motor_name": "t_motor_AntigravityMN4006KV380",
+                "propeller_name": "apc_propellers_12x6E",
+                "weight": 0.094988605,
+                "min_voltage": 0.0682,
+                "min_omega_rpm": 3.8,
+                "min_thrust": 0.0,
+                "min_power": 0.02,
+                "min_current": 0.32,
+                "med_voltage": 12.0191,
+                "med_omega_rpm": 4239.35,
+                "med_thrust": 4.64,
+                "med_power": 56.27,
+                "med_current": 4.68,
+                "max_voltage": 23.97,
+                "max_omega_rpm": 7940.89,
+                "max_thrust": 16.6,
+                "max_power": 399.66,
+                "max_current": 16.67
+            }
+        )
+    else:
+        motor_prop = MotorPropModel(
+            {
+                "motor_name": "t_motor_AntigravityMN4006KV380",
+                "propeller_name": "apc_propellers_13x4_5MR",
+                "weight": 0.092085629,
+                "min_voltage": 0.0682,
+                "min_omega_rpm": 3.8,
+                "min_thrust": 0.0,
+                "min_power": 0.02,
+                "min_current": 0.32,
+                "med_voltage": 11.2241,
+                "med_omega_rpm": 3919.9,
+                "med_thrust": 5.04,
+                "med_power": 55.33,
+                "med_current": 4.93,
+                "max_voltage": 22.38,
+                "max_omega_rpm": 7325.43,
+                "max_thrust": 17.99,
+                "max_power": 376.75,
+                "max_current": 16.83
+            }
+        )
 
     thrust_takeoff = ThrustModel(
         motor_prop=motor_prop,
@@ -415,11 +439,11 @@ def napkin2():
     aircraft_frontal_drag = 0.5 * AIR_DENSITY * \
         aircraft_frontal_area * wing_flight.speed ** 2     # N
 
-    takeoff_duration = 100.0                               # s
+    takeoff_duration = 4 * 100.0                           # s
     takeoff_capacity = thrust_takeoff.current * \
         motor_prop_count * takeoff_duration                # As
 
-    flight_distance = 5100.0                               # m
+    flight_distance = 2 * 5100.0                           # m
     flight_duration = flight_distance / wing_flight.speed  # s
     flight_capacity = thrust_flight.current * \
         motor_prop_count * flight_duration                 # As
@@ -477,6 +501,7 @@ def napkin2():
         points = points.newton_raphson(constraints_func, bounds, num_iter=10)
         points = points.prune_by_tolerances(
             constraints_func(points), tolerances=tol)
+        points = points.prune_bounding_box(bounds)
 
         points = points.extend(reports_func(points, equs_as_float=False))
         points = points.extend(constraints_func(points, equs_as_float=True))

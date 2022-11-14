@@ -99,8 +99,8 @@ def get_wing_weight(thickness: float,
 
     max_moment = ((max_load / meter_span) * meter_span ** 2) / 2
 
-    t_beam = 1/2*(meter_width - ((yield_strength*meter_width*(sympy.Max(yield_strength *
-                  meter_width ** 3 - 6 * max_moment, 0))) ** (1/4) / yield_strength ** 0.5))
+    t_beam = 1/2*(meter_width - ((yield_strength*meter_width*(yield_strength *
+                  meter_width ** 3 - 6 * max_moment)) ** (1/4) / yield_strength ** 0.5))
 
     volume = (meter_width ** 2 - (meter_width - 2 * t_beam) ** 2) * meter_span
     Mspar = volume*rho
