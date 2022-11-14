@@ -20,7 +20,6 @@ import sys
 from . import testbench_data
 from . import motor_propeller_analysis
 from . import battery_analysis
-from . import battery_analysis2
 from . import wing_analysis
 from . import aggregate_analysis
 from . import napkin_calculator
@@ -36,7 +35,6 @@ def run():
         "motor-propeller-single",
         "motor-propeller-approximate",
         "battery-analysis",
-        "battery-analysis2",
         "wing-analysis",
         "aggregate-analysis",
         "napkin-calculator",
@@ -58,8 +56,6 @@ def run():
         motor_propeller_analysis.run_approximate(args=sys.argv[2:])
     elif args.command == 'battery-analysis':
         battery_analysis.run(args=sys.argv[2:])
-    elif args.command == 'battery-analysis2':
-        battery_analysis2.run(args=sys.argv[2:])
     elif args.command == 'wing-analysis':
         wing_analysis.run(args=sys.argv[2:])
     elif args.command == 'aggregate-analysis':
