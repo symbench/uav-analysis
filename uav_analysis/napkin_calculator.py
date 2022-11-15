@@ -240,14 +240,20 @@ class MotorPropModel():
         self.voltage0 = approx_data["min_voltage"]
         self.current0 = approx_data["min_current"]
         self.thrust0 = approx_data["min_thrust"]
+        self.current0_at20 = approx_data["min_current_at20"]
+        self.thrust0_at20 = approx_data["min_thrust_at20"]
 
         self.voltage1 = approx_data["med_voltage"]
         self.current1 = approx_data["med_current"]
         self.thrust1 = approx_data["med_thrust"]
+        self.current1_at20 = approx_data["med_current_at20"]
+        self.thrust1_at20 = approx_data["med_thrust_at20"]
 
         self.voltage2 = approx_data["max_voltage"]
         self.current2 = approx_data["max_current"]
         self.thrust2 = approx_data["max_thrust"]
+        self.current2_at20 = approx_data["max_current_at20"]
+        self.thrust2_at20 = approx_data["max_thrust_at20"]
 
         assert self.voltage0 < self.voltage1 < self.voltage2
         assert self.current0 <= self.current1 <= self.current2
@@ -273,17 +279,29 @@ class MotorPropModel():
         c = numpy.linalg.solve(a, b)
         return float(c[0]) + float(c[1]) * x + float(c[2]) * x ** 2
 
-    def get_current(self, voltage: Any) -> Any:
-        return MotorPropModel.quadratic_fit(
-            self.voltage0, self.voltage1, self.voltage2,
-            self.current0, self.current1, self.current2,
-            voltage)
+    def get_current(self, voltage: Any, at20: bool = False) -> Any:
+        if not at20:
+            return MotorPropModel.quadratic_fit(
+                self.voltage0, self.voltage1, self.voltage2,
+                self.current0, self.current1, self.current2,
+                voltage)
+        else:
+            return MotorPropModel.quadratic_fit(
+                self.voltage0, self.voltage1, self.voltage2,
+                self.current0_at20, self.current1_at20, self.current2_at20,
+                voltage)
 
-    def get_thrust(self, voltage: Any) -> Any:
-        return MotorPropModel.quadratic_fit(
-            self.voltage0, self.voltage1, self.voltage2,
-            self.thrust0, self.thrust1, self.thrust2,
-            voltage)
+    def get_thrust(self, voltage: Any, at20: bool = False) -> Any:
+        if not at20:
+            return MotorPropModel.quadratic_fit(
+                self.voltage0, self.voltage1, self.voltage2,
+                self.thrust0, self.thrust1, self.thrust2,
+                voltage)
+        else:
+            return MotorPropModel.quadratic_fit(
+                self.voltage0, self.voltage1, self.voltage2,
+                self.thrust0_at20, self.thrust1_at20, self.thrust2_at20,
+                voltage)
 
 
 class ThrustModel():
@@ -292,8 +310,10 @@ class ThrustModel():
                  voltage: Optional[float] = None,
                  min_voltage: Optional[float] = None,
                  max_voltage: Optional[float] = None,
+                 at20: bool = False,
                  prefix: str = "thrust"):
 
+        self.at20 = at20
         self.prefix = prefix
 
         if min_voltage is None:
@@ -308,9 +328,9 @@ class ThrustModel():
             voltage = sympy.Symbol(self.prefix + "_voltage")
         self.voltage = voltage
 
-        self.current = motor_prop.get_current(self.voltage)
+        self.current = motor_prop.get_current(self.voltage, self.at20)
         self.power = self.voltage * self.current
-        self.thrust = motor_prop.get_thrust(self.voltage)
+        self.thrust = motor_prop.get_thrust(self.voltage, self.at20)
 
     def bounds(self) -> Dict[str, Tuple[float, float]]:
         bounds = dict()
@@ -345,58 +365,47 @@ def napkin2():
     # print(battery.report())
 
     motor_prop_count = 4
-    if False:
-        motor_prop = MotorPropModel(
-            {
-                "motor_name": "t_motor_AntigravityMN4006KV380",
-                "propeller_name": "apc_propellers_12x6E",
-                "weight": 0.094988605,
-                "min_voltage": 0.0682,
-                "min_omega_rpm": 3.8,
-                "min_thrust": 0.0,
-                "min_power": 0.02,
-                "min_current": 0.32,
-                "med_voltage": 12.0191,
-                "med_omega_rpm": 4239.35,
-                "med_thrust": 4.64,
-                "med_power": 56.27,
-                "med_current": 4.68,
-                "max_voltage": 23.97,
-                "max_omega_rpm": 7940.89,
-                "max_thrust": 16.6,
-                "max_power": 399.66,
-                "max_current": 16.67
-            }
-        )
-    else:
-        motor_prop = MotorPropModel(
-            {
-                "motor_name": "t_motor_AntigravityMN4006KV380",
-                "propeller_name": "apc_propellers_13x4_5MR",
-                "weight": 0.092085629,
-                "min_voltage": 0.0682,
-                "min_omega_rpm": 3.8,
-                "min_thrust": 0.0,
-                "min_power": 0.02,
-                "min_current": 0.32,
-                "med_voltage": 11.2241,
-                "med_omega_rpm": 3919.9,
-                "med_thrust": 5.04,
-                "med_power": 55.33,
-                "med_current": 4.93,
-                "max_voltage": 22.38,
-                "max_omega_rpm": 7325.43,
-                "max_thrust": 17.99,
-                "max_power": 376.75,
-                "max_current": 16.83
-            }
-        )
+    motor_prop = MotorPropModel(
+        {
+            "motor_name": "t_motor_MN3510KV700",
+            "propeller_name": "apc_propellers_9_625x3_75N",
+            "weight": 0.148889479,
+            "min_voltage": 0.035,
+            "min_omega_rpm": 7.0,
+            "min_thrust": 0.0,
+            "min_power": 0.02,
+            "min_current": 0.53,
+            "min_omega_rpm_at20": 7.39,
+            "min_thrust_at20": -0.01,
+            "min_power_at20": 0.02,
+            "min_current_at20": 0.51,
+            "med_voltage": 12.747499999999999,
+            "med_omega_rpm": 8701.88,
+            "med_thrust": 5.13,
+            "med_power": 84.87,
+            "med_current": 6.66,
+            "med_omega_rpm_at20": 8801.86,
+            "med_thrust_at20": 1.01,
+            "med_power_at20": 46.54,
+            "med_current_at20": 3.65,
+            "max_voltage": 25.459999999999997,
+            "max_omega_rpm": 17061.14,
+            "max_thrust": 20.07,
+            "max_power": 582.6,
+            "max_current": 22.88,
+            "max_omega_rpm_at20": 16932.88,
+            "max_thrust_at20": 16.05,
+            "max_power_at20": 680.82,
+            "max_current_at20": 26.74
+        }
+    )
 
     thrust_takeoff = ThrustModel(
         motor_prop=motor_prop,
         # voltage=battery.max_voltage,
         # min_voltage=motor_prop.min_voltage,
         max_voltage=min(motor_prop.max_voltage, battery.max_voltage),
+        at20=False,
         prefix="thrust_takeoff"
     )
     # print(takeoff.bounds())
@@ -407,6 +416,7 @@ def napkin2():
         # voltage=battery.max_voltage,
         # min_voltage=motor_prop.min_voltage,
         max_voltage=min(motor_prop.max_voltage, battery.max_voltage),
+        at20=True,
         prefix="thrust_flight"
     )
     # print(flight.bounds())
@@ -415,10 +425,9 @@ def napkin2():
     wing_count = 2
     wing = WingModel(
         naca_profile="NACA 0012",
-        # max_load=30,       # N
-        # max_load=100,
-        # chord=0.150,     # m
-        # span=0.450,      # m
+        # max_load=25,  # N
+        # chord=0.1,    # m
+        # span=0.6,     # m
         prefix="wing",
     )
     # print(wing.bounds())
@@ -431,22 +440,25 @@ def napkin2():
     # print(liftdrag.bounds())
     # print(liftdrag.report())
 
-    aircraft_weight = 2.5 + battery.weight \
+    cargo_weight = 0.5
+    aircraft_weight = 1.47 + cargo_weight + battery.weight \
         + motor_prop_count * motor_prop.weight \
         + wing_count * wing.weight                         # kg
 
-    aircraft_frontal_area = 0.057                          # m^2
+    aircraft_frontal_area = 0.057456                       # m^2
     aircraft_frontal_drag = 0.5 * AIR_DENSITY * \
         aircraft_frontal_area * wing_flight.speed ** 2     # N
 
-    takeoff_duration = 4 * 100.0                           # s
+    takeoff_duration = 2 * 100.0                           # s
     takeoff_capacity = thrust_takeoff.current * \
         motor_prop_count * takeoff_duration                # As
 
-    flight_distance = 2 * 5100.0                           # m
+    flight_distance = 5100.0                               # m
     flight_duration = flight_distance / wing_flight.speed  # s
     flight_capacity = thrust_flight.current * \
         motor_prop_count * flight_duration                 # As
+
+    capacity_frac = (takeoff_capacity + flight_capacity) / battery.capacity
 
     bounds = {
         **battery.bounds(),
@@ -465,7 +477,7 @@ def napkin2():
         "equ_flight_voltage": battery.max_voltage >= thrust_flight.voltage,
         "equ_flight_lift": wing_flight.lift * wing_count >= aircraft_weight * GRAVITATION,
         "equ_flight_drag": wing_flight.drag * wing_count + aircraft_frontal_drag <= thrust_flight.thrust * motor_prop_count,
-        "equ_total_capacity": battery.capacity * 0.8 >= takeoff_capacity + flight_capacity,
+        "equ_total_capacity": capacity_frac < 0.5,
     }
 
     reports = {
@@ -481,6 +493,7 @@ def napkin2():
         "takeoff_capacity": takeoff_capacity,
         "flight_duration": flight_duration,
         "flight_capacity": flight_capacity,
+        "capacity_frac": capacity_frac,
     }
 
     print("bounds:\n", bounds)
