@@ -30,6 +30,12 @@ PROPELLER = re.compile(
 WING = re.compile(
     r"^(\s*wing\(\d*\)\%([xyz])\s*=\s*)([-+0-9.e]*)\s*$")
 
+SPEED = re.compile(
+    r"^(\s*control\%requested_(lateral_speed|vertical_speed|vertical_down_speed)\s*=\s*)([-+0-9.e]*)\s*$")
+
+ACCEL = re.compile(
+    r"^(\s*control\%requested_(lateral_acceleration|lateral_deceleration|vertical_acceleration|vertical_deceleration)\s*=\s*)([-+0-9.e]*)\s*$")
+
 CONTROL = re.compile(
     r"^(\s*control\%([QR])[_a-zA-Z]*\s*=\s*)([-+0-9.e]*)\s*$")
 
@@ -37,6 +43,7 @@ CONTROL = re.compile(
 def rewrite_line(line: str,
                  prop_delta: Tuple[float, float, float],
                  wing_delta: Tuple[float, float, float],
+                 speed_delta: Tuple[float, float],
                  control_coef: Tuple[float, float],
                  ) -> str:
 
@@ -52,6 +59,18 @@ def rewrite_line(line: str,
         new_value = old_value + random.randint(-10, 10) * 0.1 * new_delta
         return match.group(1) + str(new_value) + "\n"
 
+    if match := SPEED.match(line):
+        old_value = float(match.group(3))
+        new_delta = random.randint(0, 2) * 0.5 * speed_delta[0]
+        new_value = old_value + (new_delta if old_value >= 0 else -new_delta)
+        return match.group(1) + str(new_value) + "\n"
+
+    if match := ACCEL.match(line):
+        old_value = float(match.group(3))
+        new_delta = random.randint(0, 2) * 0.5 * speed_delta[1]
+        new_value = old_value + (new_delta if old_value >= 0 else -new_delta)
+        return match.group(1) + str(new_value) + "\n"
+
     if match := CONTROL.match(line):
         old_value = float(match.group(3))
         new_coef = control_coef["QR".index(match.group(2))]
@@ -64,11 +83,16 @@ def rewrite_line(line: str,
 def create_fdm_input(lines: List[str],
                      prop_delta: Tuple[float, float, float],
                      wing_delta: Tuple[float, float, float],
+                     speed_delta: Tuple[float, float],
                      control_coef: Tuple[float, float],
                      ) -> str:
     fdm_input = ""
     for line in lines:
-        fdm_input += rewrite_line(line, prop_delta, wing_delta, control_coef)
+        fdm_input += rewrite_line(line,
+                                  prop_delta=prop_delta,
+                                  wing_delta=wing_delta,
+                                  speed_delta=speed_delta,
+                                  control_coef=control_coef)
     return fdm_input
 
 
@@ -184,6 +208,9 @@ def run(args=None):
     parser.add_argument('--wing-delta', metavar='N', type=float, nargs=3,
                         default=[0, 0, 0],
                         help='sets the wing x, y and z maximum deltas')
+    parser.add_argument('--speed-delta', metavar='N', type=int, nargs=2,
+                        default=[0, 0],
+                        help='sets speed and acceleration maximum deltas')
     parser.add_argument('--control-coef', metavar='N', type=float, nargs=2,
                         default=[1, 1],
                         help='sets the controller Q and R maximum multipliers')
@@ -204,10 +231,10 @@ def run(args=None):
         def task(index):
             fdm_input = create_fdm_input(
                 lines,
-                args.prop_delta,
-                args.wing_delta,
-                args.control_coef,
-            )
+                prop_delta=args.prop_delta,
+                wing_delta=args.wing_delta,
+                speed_delta=args.speed_delta,
+                control_coef=args.control_coef)
             fdm_output = run_new_fdm(fdm_binary, input_path, fdm_input)
             result = parse_fdm_output(fdm_output)
             result["fdm_input"] = fdm_input
