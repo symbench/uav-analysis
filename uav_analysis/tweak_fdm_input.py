@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (C) 2021, Carlos Olea and Miklos Maroti
+# Copyright (C) 2022, Miklos Maroti
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,16 +30,15 @@ PROPELLER = re.compile(
 WING = re.compile(
     r"^(\s*wing\(\d*\)\%([xyz])\s*=\s*)([-+0-9.e]*)\s*$")
 
-TOTAL_SCORE = re.compile(
-    r"^\s*Path_traverse_score_based_on_requirements\s*([-+0-9.]*)\s*$")
-
-TOTAL_DIST = re.compile(
-    r"^\s*Flight_distance\s*([-+0-9.]*)\s*$")
+CONTROL = re.compile(
+    r"^(\s*control\%([QR])[_a-zA-Z]*\s*=\s*)([-+0-9.e]*)\s*$")
 
 
 def rewrite_line(line: str,
                  prop_delta: Tuple[float, float, float],
-                 wing_delta: Tuple[float, float, float]) -> str:
+                 wing_delta: Tuple[float, float, float],
+                 control_coef: Tuple[float, float],
+                 ) -> str:
 
     if match := PROPELLER.match(line):
         old_value = float(match.group(3))
@@ -53,16 +52,23 @@ def rewrite_line(line: str,
         new_value = old_value + random.randint(-10, 10) * 0.1 * new_delta
         return match.group(1) + str(new_value) + "\n"
 
+    if match := CONTROL.match(line):
+        old_value = float(match.group(3))
+        new_coef = control_coef["QR".index(match.group(2))]
+        new_value = old_value * new_coef ** (random.randint(-10, 10) * 0.1)
+        return match.group(1) + str(new_value) + "\n"
+
     return line
 
 
 def create_fdm_input(lines: List[str],
                      prop_delta: Tuple[float, float, float],
                      wing_delta: Tuple[float, float, float],
+                     control_coef: Tuple[float, float],
                      ) -> str:
     fdm_input = ""
     for line in lines:
-        fdm_input += rewrite_line(line, prop_delta, wing_delta)
+        fdm_input += rewrite_line(line, prop_delta, wing_delta, control_coef)
     return fdm_input
 
 
@@ -76,6 +82,13 @@ def run_new_fdm(fdm_binary: str, path: str, fdm_input: str) -> str:
     if proc.returncode != 0:
         raise KeyboardInterrupt
     return fdm_output.decode()
+
+
+TOTAL_SCORE = re.compile(
+    r"^\s*Path_traverse_score_based_on_requirements\s*([-+0-9.]*)\s*$")
+
+TOTAL_DIST = re.compile(
+    r"^\s*Flight_distance\s*([-+0-9.]*)\s*$")
 
 
 def parse_fdm_output(fdm_output: str) -> Dict[str, float]:
@@ -116,12 +129,12 @@ def parse_fdm_output(fdm_output: str) -> Dict[str, float]:
         "avg_drag": round(avg_drag / max(num_trims, 1), 2),
         # "avg_current": round(avg_current / max(num_trims, 1), 2),
         "avg_power": round(avg_power / max(num_trims, 1), 2),
-        'path_dist': total_dist,
+        'path_dist': round(total_dist, 2),
         'path_score': total_score,
     }
 
 
-def is_better(old_result, new_result) -> bool:
+def is_better_trims(old_result, new_result) -> bool:
     if old_result is None:
         return True
 
@@ -130,6 +143,19 @@ def is_better(old_result, new_result) -> bool:
 
     if new_result["max_speed"] != old_result["max_speed"]:
         return new_result["max_speed"] > old_result["max_speed"]
+
+    return new_result["avg_power"] < old_result["avg_power"]
+
+
+def is_better_score(old_result, new_result) -> bool:
+    if old_result is None:
+        return True
+
+    if new_result["path_score"] != old_result["path_score"]:
+        return new_result["path_score"] > old_result["path_score"]
+
+    if new_result["num_trims"] != old_result["num_trims"]:
+        return new_result["num_trims"] > old_result["num_trims"]
 
     return new_result["avg_power"] < old_result["avg_power"]
 
@@ -146,27 +172,43 @@ def run(args=None):
     parser.add_argument('--input', metavar='FILE', type=str,
                         default="flightDynFast.inp",
                         help='sets the input filenam')
+    parser.add_argument('--output', metavar="FILE", type=str,
+                        default='tweaked.inp',
+                        help="sets the optimized input filename")
     parser.add_argument('--nproc', type=int, default=8,
                         help='number of processes')
     parser.add_argument('--runs', type=int, default=100,
                         help='sets the number of runs')
     parser.add_argument('--prop-delta', metavar='N', type=float, nargs=3,
                         default=[0, 0, 0],
-                        help='sets the x, y and z maximum deltas for the propellers')
+                        help='sets the propeller x, y and z maximum deltas')
     parser.add_argument('--wing-delta', metavar='N', type=float, nargs=3,
                         default=[0, 0, 0],
-                        help='sets the x, y and z maximum deltas for the wings')
+                        help='sets the wing x, y and z maximum deltas')
+    parser.add_argument('--control-coef', metavar='N', type=float, nargs=2,
+                        default=[1, 1],
+                        help='sets the controller Q and R maximum multipliers')
+    parser.add_argument("--optimize", type=str, default="trims",
+                        choices=["trims", "score"],
+                        help="sets the optimization type")
 
     args = parser.parse_args(args)
 
+    fdm_binary = os.path.abspath(args.fdm)
+    input_path = os.path.dirname(os.path.abspath(args.input))
+    is_better = is_better_trims if args.optimize == "trims" \
+        else is_better_score
+
     with open(args.input, 'r') as f:
         lines = f.readlines()
-        fdm_binary = os.path.abspath(args.fdm)
-        input_path = os.path.dirname(os.path.abspath(args.input))
 
         def task(index):
             fdm_input = create_fdm_input(
-                lines, args.prop_delta, args.wing_delta)
+                lines,
+                args.prop_delta,
+                args.wing_delta,
+                args.control_coef,
+            )
             fdm_output = run_new_fdm(fdm_binary, input_path, fdm_input)
             result = parse_fdm_output(fdm_output)
             result["fdm_input"] = fdm_input
@@ -184,9 +226,9 @@ def run(args=None):
             results = executor.map(task, range(args.runs))
             for result in results:
                 if is_better(best, result):
-                    with open(args.input + ".tweaked", 'w') as f:
+                    with open(args.output, 'w') as f:
                         f.write(result["fdm_input"])
-                    with open(args.input + ".output", 'w') as f:
+                    with open(os.path.splitext(args.output)[0] + ".out", 'w') as f:
                         f.write(result["fdm_output"])
                     result["best"] = True
                     best = result
