@@ -14,48 +14,40 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Generator
+from typing import Dict, List, Tuple
 
 import concurrent.futures
-import csv
-import math
 import os
 import subprocess
-import sys
 import re
 import random
 
 from .components import DATAPATH
 
 PROPELLER = re.compile(
-    r"^(\s*propeller\(\d*\)\%([xyz])\s*=\s*)([+-]?\d+\.?|[+-]?\d*\.\d+|[+-]?\d*\.\d+e[+-]\d+)\s*$")
+    r"^(\s*propeller\(\d*\)\%([xyz])\s*=\s*)([-+0-9.e]*)\s*$")
 
 WING = re.compile(
-    r"^(\s*wing\(\d*\)\%([xyz])\s*=\s*)([+-]?\d+\.?|[+-]?\d*\.\d+|[+-]?\d*\.\d+e[+-]\d+)\s*$")
+    r"^(\s*wing\(\d*\)\%([xyz])\s*=\s*)([-+0-9.e]*)\s*$")
 
+TOTAL_SCORE = re.compile(
+    r"^\s*Path_traverse_score_based_on_requirements\s*([-+0-9.]*)\s*$")
 
-def find_tweakes(fdm_input: List[str]) -> Dict[str, float]:
-    values = dict()
-    for line in fdm_input:
-        for pat in [PROPELLER, WING]:
-            match = pat.match(line)
-            if match:
-                values[match.group(1)] = float(match.group(2))
-    return values
+TOTAL_DIST = re.compile(
+    r"^\s*Flight_distance\s*([-+0-9.]*)\s*$")
 
 
 def rewrite_line(line: str,
                  prop_delta: Tuple[float, float, float],
                  wing_delta: Tuple[float, float, float]) -> str:
-    match = PROPELLER.match(line)
-    if match:
+
+    if match := PROPELLER.match(line):
         old_value = float(match.group(3))
         new_delta = prop_delta["xyz".index(match.group(2))]
         new_value = old_value + random.randint(-10, 10) * 0.1 * new_delta
         return match.group(1) + str(new_value) + "\n"
 
-    match = WING.match(line)
-    if match:
+    if match := WING.match(line):
         old_value = float(match.group(3))
         new_delta = wing_delta["xyz".index(match.group(2))]
         new_value = old_value + random.randint(-10, 10) * 0.1 * new_delta
@@ -93,10 +85,11 @@ def parse_fdm_output(fdm_output: str) -> Dict[str, float]:
     avg_drag = 0.0
     avg_current = 0.0
     avg_power = 0.0
+    total_score = 0.0
+    total_dist = 0.0
 
-    lines = fdm_output.splitlines()
     active = False
-    for line in lines:
+    for line in fdm_output.splitlines():
         if line.startswith("  Lateral speed  Distance  Flight time  Pitch angle  Max uc    Thrust      Lift       Drag    Current  Total power Frac amp  Frac pow  Frac current"):
             active = True
         elif line == "":
@@ -104,7 +97,6 @@ def parse_fdm_output(fdm_output: str) -> Dict[str, float]:
         elif active:
             if line.startswith("      (m/s)") or line[11:23] == "            ":
                 continue
-
             num_trims += 1
             # fortran uses fixed widths
             max_speed = max(max_speed, float(line[0:11]))
@@ -112,14 +104,20 @@ def parse_fdm_output(fdm_output: str) -> Dict[str, float]:
             avg_drag += float(line[80:91])
             avg_current += float(line[91:102])
             avg_power += float(line[102:113])
+        elif match := TOTAL_SCORE.match(line):
+            total_score = float(match.group(1))
+        elif match := TOTAL_DIST.match(line):
+            total_dist = float(match.group(1))
 
     return {
         "num_trims": num_trims,
         "max_speed": max_speed,
         "min_pitch": min_pitch,
-        "avg_drag": avg_drag / max(num_trims, 1),
-        "avg_current": avg_current / max(num_trims, 1),
-        "avg_power": avg_power / max(num_trims, 1),
+        "avg_drag": round(avg_drag / max(num_trims, 1), 2),
+        # "avg_current": round(avg_current / max(num_trims, 1), 2),
+        "avg_power": round(avg_power / max(num_trims, 1), 2),
+        'path_dist': total_dist,
+        'path_score': total_score,
     }
 
 
@@ -148,6 +146,8 @@ def run(args=None):
     parser.add_argument('--input', metavar='FILE', type=str,
                         default="flightDynFast.inp",
                         help='sets the input filenam')
+    parser.add_argument('--nproc', type=int, default=8,
+                        help='number of processes')
     parser.add_argument('--runs', type=int, default=100,
                         help='sets the number of runs')
     parser.add_argument('--prop-delta', metavar='N', type=float, nargs=3,
@@ -170,22 +170,33 @@ def run(args=None):
             fdm_output = run_new_fdm(fdm_binary, input_path, fdm_input)
             result = parse_fdm_output(fdm_output)
             result["fdm_input"] = fdm_input
+            result["fdm_output"] = fdm_output
             return result
 
+        def print_result(result):
+            result = dict(result)
+            del result["fdm_input"]
+            del result["fdm_output"]
+            print(result)
+
         best = None
-        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.nproc) as executor:
             results = executor.map(task, range(args.runs))
             for result in results:
                 if is_better(best, result):
-                    best = dict(result)
-                    with open(args.input + ".best", 'w') as f:
-                        f.write(best["fdm_input"])
+                    with open(args.input + ".tweaked", 'w') as f:
+                        f.write(result["fdm_input"])
+                    with open(args.input + ".output", 'w') as f:
+                        f.write(result["fdm_output"])
                     result["best"] = True
+                    best = result
                 else:
                     result["best"] = False
 
-                del result["fdm_input"]
-                print(result)
+                print_result(result)
+
+        print("\nBest was:")
+        print_result(best)
 
 
 if __name__ == '__main__':
