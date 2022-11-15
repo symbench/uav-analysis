@@ -24,6 +24,7 @@ from . import wing_analysis
 from . import aggregate_analysis
 from . import napkin_calculator
 from . import symbolic_propeller
+from . import tweak_centers
 
 
 def run():
@@ -39,6 +40,7 @@ def run():
         "aggregate-analysis",
         "napkin-calculator",
         "symbolic-propeller",
+        'tweak-centers',
     ])))
     args = parser.parse_args(sys.argv[1:2])
 
@@ -64,6 +66,8 @@ def run():
         napkin_calculator.run(args=sys.argv[2:])
     elif args.command == 'symbolic-propeller':
         symbolic_propeller.run(args=sys.argv[2:])
+    elif args.command == 'tweak-centers':
+        tweak_centers.run(args=sys.argv[2:])
     else:
         parser.print_help()
 
