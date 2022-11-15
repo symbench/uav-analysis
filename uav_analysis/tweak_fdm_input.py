@@ -22,7 +22,7 @@ import subprocess
 import re
 import random
 
-from .components import DATAPATH
+from .components import FDM_PATH
 
 PROPELLER = re.compile(
     r"^(\s*propeller\(\d*\)\%([xyz])\s*=\s*)([-+0-9.e]*)\s*$")
@@ -166,8 +166,7 @@ def run(args=None):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--fdm',
-                        default=os.path.relpath(os.path.join(
-                            DATAPATH, '..', '..', 'flight-dynamics-model', 'bin', 'new_fdm_nolog')),
+                        default=os.path.join(FDM_PATH, 'new_fdm_nolog'),
                         metavar='PATH', help="path to fdm executable")
     parser.add_argument('--input', metavar='FILE', type=str,
                         default="flightDynFast.inp",

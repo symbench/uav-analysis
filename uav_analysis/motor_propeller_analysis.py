@@ -23,7 +23,7 @@ import os
 import subprocess
 import sys
 
-from .components import DATAPATH, MOTORS, PROPELLERS
+from .components import MOTORS, PROPELLERS, FDM_PATH, PROP_PATH
 
 
 def generate_fdm_input(
@@ -310,12 +310,10 @@ def run_single(args=None):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--propdata',
-                        default=os.path.relpath(
-                            os.path.join(DATAPATH, '..', 'prop_tables')),
+                        default=PROP_PATH,
                         metavar='DIR', help="path to propeller data directory")
     parser.add_argument('--fdm',
-                        default=os.path.relpath(os.path.join(
-                            DATAPATH, '..', '..', 'flight-dynamics-model', 'bin', 'new_fdm_step0')),
+                        default=os.path.join(FDM_PATH, 'new_fdm_step0'),
                         metavar='PATH', help="path to fdm executable")
     parser.add_argument('motor', metavar='MOTOR', help='motor name')
     parser.add_argument('propeller', metavar='PROPELLER',
@@ -421,12 +419,10 @@ def run_approximate(args=None):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--propdata',
-                        default=os.path.relpath(
-                            os.path.join(DATAPATH, '..', 'prop_tables')),
+                        default=PROP_PATH,
                         metavar='DIR', help="path to propeller data directory")
     parser.add_argument('--fdm',
-                        default=os.path.relpath(os.path.join(
-                            DATAPATH, '..', '..', 'flight-dynamics-model', 'bin', 'new_fdm_step0')),
+                        default=os.path.join(FDM_PATH, 'new_fdm_step0'),
                         metavar='PATH', help="path to fdm executable")
     parser.add_argument('motor', metavar='MOTOR', help='motor name')
     parser.add_argument('propeller', metavar='PROPELLER',
@@ -451,8 +447,7 @@ def run(args=None):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--propdata',
-                        default=os.path.relpath(os.path.join(
-                            DATAPATH, '..', 'prop_tables')),
+                        default=PROP_PATH,
                         metavar='DIR', help="path to propeller data directory")
     parser.add_argument('--output', default='motor_propeller_analysis.csv',
                         metavar='FILENAME', help="output file name")
@@ -461,8 +456,7 @@ def run(args=None):
     parser.add_argument('--no-at20-limits', action='store_true',
                         help="do not check 20 m/s power and J values")
     parser.add_argument('--fdm',
-                        default=os.path.relpath(os.path.join(
-                            DATAPATH, '..', '..', 'flight-dynamics-model', 'bin', 'new_fdm_step0')),
+                        default=os.path.join(FDM_PATH, 'new_fdm_step0'),
                         metavar='PATH', help="path to fdm executable")
     parser.add_argument('--propeller', metavar='NAME',
                         help='limits the search space to this propeller')

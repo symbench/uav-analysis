@@ -24,6 +24,11 @@ import os
 DATAPATH = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                         'data_hackathon2')
 
+FDM_PATH = default = os.path.relpath(os.path.join(
+    DATAPATH, '..', '..', 'flight-dynamics-model', 'bin'))
+
+PROP_PATH = os.path.abspath(os.path.join(DATAPATH, "..", "PropData"))
+
 
 def load_static_data(filename: str, modelkey: str = 'MODEL_NAME') -> Dict[str, Dict[str, Any]]:
     filename = os.path.join(DATAPATH, filename)
@@ -49,7 +54,7 @@ AERO_INFO = load_static_data('aero_info.json')
 
 
 def find_rpm_j_minmax(perf_file: str) -> Tuple[float, float, float, float]:
-    filename = os.path.join(DATAPATH, "..", "prop_tables", perf_file)
+    filename = os.path.join(PROP_PATH, perf_file)
     rpms = []
     js = []
     with open(filename, 'r') as file:

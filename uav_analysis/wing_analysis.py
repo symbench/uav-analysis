@@ -23,7 +23,7 @@ import os
 import re
 import sympy
 
-from .components import DATAPATH, AERO_INFO
+from .components import AERO_INFO, FDM_PATH
 
 
 NACA_PROFILE = re.compile(r"^NACA \d\d(\d\d)$")
@@ -329,8 +329,7 @@ def run(args=None):
                         default='wing_analysis.csv',
                         help="output file name")
     parser.add_argument('--fdm',
-                        default=os.path.relpath(os.path.join(
-                            DATAPATH, '..', '..', 'flight-dynamics-model', 'bin', 'new_fdm_step0')),
+                        default=os.path.join(FDM_PATH, 'new_fdm_step0'),
                         metavar='PATH', help="path to fdm executable")
     parser.add_argument('--speed', type=float, default=50.0,
                         help='change the target speed')
