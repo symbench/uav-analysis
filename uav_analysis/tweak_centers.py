@@ -143,7 +143,7 @@ def run(args=None):
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--fdm',
                         default=os.path.relpath(os.path.join(
-                            DATAPATH, '..', '..', 'flight-dynamics-model', 'bin', 'new_fdm')),
+                            DATAPATH, '..', '..', 'flight-dynamics-model', 'bin', 'new_fdm_nolog')),
                         metavar='PATH', help="path to fdm executable")
     parser.add_argument('--input', metavar='FILE', type=str,
                         default="flightDynFast.inp",
