@@ -151,7 +151,6 @@ def create_single_datapoint(motor: Dict[str, Any],
     result["omega_rpm"] = output_data["MaxVolt.OmegaRpm"]  # rpm
     result["voltage"] = output_data["MaxVolt.Voltage"]     # V
     result["thrust"] = output_data["MaxVolt.Thrust"]       # N
-    result["torque"] = output_data["MaxVolt.Torque"]       # Nm
     result["power"] = output_data["MaxVolt.Power"]         # W
     result["current"] = output_data["MaxVolt.Current"]     # A
 
@@ -163,8 +162,18 @@ def create_single_datapoint(motor: Dict[str, Any],
         (result["omega_rpm_at20"] / 60.0 * result['propeller_diameter'])
 
     # the other values (the thrust) are not reliable
-    result["max_voltage"] = min(output_data["MaxPower.Voltage"],
-                                output_data["MaxAmps.Voltage"])
+    if output_data["MaxPower.Voltage"] < output_data["MaxAmps.Voltage"]:
+        result["max_omega_rpm"] = output_data["MaxPower.OmegaRpm"]
+        result["max_voltage"] = output_data["MaxPower.Voltage"]
+        result["max_thrust"] = output_data["MaxPower.Thrust"]
+        result["max_power"] = output_data["MaxPower.Power"]
+        result["max_current"] = output_data["MaxPower.Current"]
+    else:
+        result["max_omega_rpm"] = output_data["MaxAmps.OmegaRpm"]
+        result["max_voltage"] = output_data["MaxAmps.Voltage"]
+        result["max_thrust"] = output_data["MaxAmps.Thrust"]
+        result["max_power"] = output_data["MaxAmps.Power"]
+        result["max_current"] = output_data["MaxAmps.Current"]
 
     result["thrust_per_weight"] = result["thrust"] / result["weight"]
     result["power_per_weight"] = result["power"] / result["weight"]
@@ -226,7 +235,7 @@ def generate_multi_datapoints(
 
         if min(datapoint["omega_rpm"], datapoint["voltage"],
                datapoint["power"], datapoint["thrust"],
-               datapoint["torque"], datapoint["current"]) <= 0.0:
+               datapoint["current"]) <= 0.0:
             continue
 
         result.append(datapoint)
