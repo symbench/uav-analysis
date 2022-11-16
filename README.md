@@ -24,4 +24,7 @@
   We also generate performance data at 20 m/s air (crusing) speed. Used
   `constraint-prog pareto-front --max weight 0.2 --min thrust 14.0 thrust_at20 10.0 --neg weight power --pos thrust --save motor_propeller_analysis_pareto.csv motor_propeller_analysis.csv` 
   to find one possible pareto front, and saved it into the `data_hackathon2` folder.
-  
+* Used `uav-analysis battery-analysis --max-parallel 2 --output battery_analysis.csv` to generate
+  all combination of batteries, then pruned it using
+  `constraint-prog pareto-front --neg total_weight --pos total_voltage total_capacity total_max_current --save battery_analysis_pareto.csv battery_analysis.csv`, and saved it the
+  `data_hackathon2` folder.

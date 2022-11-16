@@ -357,9 +357,11 @@ class ThrustModel():
 
 def napkin2():
     battery = BatteryModel(
-        battery_name="TurnigyGraphene6000mAh6S75C",
         series_count=1,
-        parallel_count=2,
+        # battery_name="TurnigyGraphene6000mAh6S75C",
+        # parallel_count=2,
+        battery_name="Tattu30C12000mAh6S1P",
+        parallel_count=1,
     )
     # print(battery.bounds())
     # print(battery.report())

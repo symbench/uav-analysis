@@ -23,52 +23,51 @@ import sys
 
 from .components import BATTERIES
 
-"""
-The battery pack is needs to deliver a relatively fixed voltage, large
-enough to optimally drive the motor, but not too much so that it is not
-over the power/current limit of the motor. So we need to specify a max
-voltage and also try to maximize the voltage below that, which involves
-setting the series count. The battery pack maximizes its total energy,
-the current (The Vitaly Beta cannot give enough instantaneous current),
-while minimizing its weight and volume. We are not limited in practice 
-by volume, so we maximize the energy and current per weight.
 
-Based on the pareto front and 940 max voltage, there are only 3 options:
-- Vitaly Beta (not enough current),
-- Tattu 25Ah Li (the overall winner),
-- Eagle 11 Ah Li (slightly better voltage, but not enough current).
-"""
+def battery_generator(max_series: int,
+                      max_parallel: int,
+                      max_voltage: Optional[float] = None,
+                      battery_name: Optional[str] = None,
+                      ) -> Generator[Dict[str, Any], None, None]:
 
-
-def series_generator(max_voltage: float,
-                     battery: Optional[str] = None,
-                     ) \
-        -> Generator[Dict[str, Any], None, None]:
-
-    for batt in BATTERIES.values():
-        name = batt["Name"]
-        if battery and name != battery:
+    for battery in BATTERIES.values():
+        name = battery["MODEL"]
+        if battery_name and name != battery_name:
             continue
 
-        voltage = float(batt["Min Voltage [V]"])
-        capacity = float(batt["Capacity [Ah]"])
-        discharge_rate = float(batt["Cont. Discharge Rate [C]"])
-        weight = float(batt["Weight [kg]"])
-        volume = float(batt["Volume [mm^3]"]) * 1e-9
+        voltage = float(battery["VOLTAGE"])                     # V
+        capacity = float(battery["CAPACITY"]) * 1e-3            # Ah from mAh
+        weight = float(battery["WEIGHT"])                       # kg
+        length = float(battery["LENGTH"]) * 1e-3                # m from mm
+        width = float(battery["WIDTH"]) * 1e-3                  # m from mm
+        thickness = float(battery["THICKNESS"]) * 1e-3          # m from mm
+        volume = length * width * thickness                     # m^3
+        discharge_rate = float(battery["CONT_DISCHARGE_RATE"])  # C
 
-        for series in range(1, int(math.floor(max_voltage / voltage)) + 1):
-            yield {
-                "name": name,
-                "series_count": series,
-                "voltage": voltage * series,
-                "capacity": capacity,
-                "current": capacity * discharge_rate,
-                "weight": weight * series,
-                "volume": volume * series,
-                "energy": voltage * capacity * series,
-                "energy_per_weight": voltage * capacity / weight,
-                "current_per_weight": capacity * discharge_rate / (weight * series),
-            }
+        for series in range(1, max_series + 1):
+            if max_voltage and voltage * series > max_voltage:
+                break
+
+            for parallel in range(1, max_parallel + 1):
+                yield {
+                    "name": name,
+                    "series_count": series,
+                    "parallel_count": parallel,
+                    "discharge_rate": discharge_rate,                 # C
+                    "single_length": length,                          # m
+                    "single_width": width,                            # m
+                    "single_thickness": thickness,                    # m
+                    "single_voltage": voltage,                        # V
+                    "single_capacity": capacity,                      # Ah
+                    "single_weight": weight,                          # kg
+                    "single_volume": volume,                          # m^3
+                    "single_max_current": capacity * discharge_rate,  # A
+                    "total_voltage": voltage * series,
+                    "total_capacity": capacity * parallel,
+                    "total_weight": weight * series * parallel,
+                    "total_volume": volume * series * parallel,
+                    "total_max_current": capacity * parallel * discharge_rate,
+                }
 
 
 def save_to_csv(iterable: Iterable[Dict[str, Any]], output: str):
@@ -81,16 +80,12 @@ def save_to_csv(iterable: Iterable[Dict[str, Any]], output: str):
                 writer.writeheader()
             writer.writerow(row)
             if count % 100 == 0:
-                sys.stdout.write("\r{}".format(count))
+                sys.stdout.write("\rGenerated: {}".format(count))
                 sys.stdout.flush()
             count += 1
 
+    sys.stdout.write("\rGenerated: {}".format(count))
     print("\nResults saved to", output)
-
-
-def print_json(iterable: Iterable[Dict[str, Any]]):
-    for row in iterable:
-        print(json.dumps(row, indent=2))
 
 
 def run(args=None):
@@ -100,22 +95,29 @@ def run(args=None):
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--battery', metavar="NAME",
                         help="limits the search to this battery")
-    parser.add_argument('--max-voltage', type=float, metavar="VOLT",
-                        default=1000,
+    parser.add_argument('--max-voltage', type=float, metavar="VOLT", default=None,
                         help="maximum voltage of the pack")
+    parser.add_argument('--max-series', type=int, metavar="NUM", default=1,
+                        help="maximum series count")
+    parser.add_argument('--max-parallel', type=int, metavar="NUM", default=1,
+                        help="maximum parallel count")
     parser.add_argument('--output', metavar="FILE",
                         help="save data to this CSV file")
 
     args = parser.parse_args(args)
 
-    generator = series_generator(
+    generator = battery_generator(
+        max_series=args.max_series,
+        max_parallel=args.max_parallel,
         max_voltage=args.max_voltage,
-        battery=args.battery)
+        battery_name=args.battery,
+    )
 
     if args.output:
         save_to_csv(generator, args.output)
     else:
-        print_json(generator)
+        for row in generator:
+            print(json.dumps(row, indent=2))
 
 
 if __name__ == '__main__':
