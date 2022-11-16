@@ -61,12 +61,12 @@ def battery_generator(max_series: int,
                     "single_capacity": capacity,                      # Ah
                     "single_weight": weight,                          # kg
                     "single_volume": volume,                          # m^3
-                    "single_max_current": capacity * discharge_rate,  # A
+                    "single_current": capacity * discharge_rate,      # A
                     "total_voltage": voltage * series,
                     "total_capacity": capacity * parallel,
                     "total_weight": weight * series * parallel,
                     "total_volume": volume * series * parallel,
-                    "total_max_current": capacity * parallel * discharge_rate,
+                    "total_current": capacity * parallel * discharge_rate,
                 }
 
 

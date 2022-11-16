@@ -26,5 +26,5 @@
   to find one possible pareto front, and saved it into the `data_hackathon2` folder.
 * Used `uav-analysis battery-analysis --max-parallel 2 --output battery_analysis.csv` to generate
   all combination of batteries, then pruned it using
-  `constraint-prog pareto-front --neg total_weight --pos total_voltage total_capacity total_max_current --save battery_analysis_pareto.csv battery_analysis.csv`, and saved it the
+  `constraint-prog pareto-front --neg total_weight --pos total_voltage total_capacity total_current --save battery_analysis_pareto.csv battery_analysis.csv`, and saved it the
   `data_hackathon2` folder.

@@ -1,4 +1,4 @@
-series_count,parallel_count,discharge_rate,single_length,single_width,single_thickness,single_voltage,single_capacity,single_weight,single_volume,single_max_current,total_voltage,total_capacity,total_weight,total_volume,total_max_current,name
+series_count,parallel_count,discharge_rate,single_length,single_width,single_thickness,single_voltage,single_capacity,single_weight,single_volume,single_current,total_voltage,total_capacity,total_weight,total_volume,total_current,name
 1.0,1.0,10.0,0.207,0.091,0.065,22.8,25.0,2.577,0.001224405,250.0,22.8,25.0,2.577,0.001224405,250.0,Tattu10C25000mAh6S1PHV
 1.0,2.0,10.0,0.207,0.091,0.065,22.8,25.0,2.577,0.001224405,250.0,22.8,50.0,5.154,0.00244881,500.0,Tattu10C25000mAh6S1PHV
 1.0,1.0,10.0,0.216,0.125,0.061,22.8,32.0,3.494,0.001647,320.0,22.8,32.0,3.494,0.001647,320.0,Tattu10C32000mAh6S1PHV

@@ -17,22 +17,22 @@
 from typing import Any, Dict, Optional, Tuple
 
 import json
-import math
 import numpy
+import os
 import sympy
 
-from .components import BATTERIES, AERO_INFO
+from .components import BATTERIES, AERO_INFO, DATA_PATH
 from .wing_analysis import get_wing_thickness, get_wing_data, get_wing_weight
 
 from constraint_prog.point_cloud import PointCloud, PointFunc
-from constraint_prog.sympy_func import SympyFunc
+from constraint_prog.sympy_func import pareto_func
 
 
 AIR_DENSITY = 1.225  # kg/m^3
 GRAVITATION = 9.81   # m/s^2
 
 
-class BatteryModel():
+class SimpleBatteryModel():
     def __init__(self,
                  battery_name: str,
                  series_count: Optional[int] = None,
@@ -43,9 +43,9 @@ class BatteryModel():
         self.battery_name = battery_name
         self.prefix = prefix
 
-        single_max_voltage = float(battery["VOLTAGE"])      # V
-        single_capacity = float(battery["CAPACITY"]) * 3.6  # As (from mAh)
-        single_weight = float(battery["WEIGHT"])            # kg
+        single_voltage = float(battery["VOLTAGE"])           # V
+        single_capacity = float(battery["CAPACITY"]) * 1e-3  # Ah
+        single_weight = float(battery["WEIGHT"])             # kg
         single_volume = float(battery["LENGTH"]) \
             * float(battery["WIDTH"]) \
             * float(battery["THICKNESS"]) * 1e-9                # m^3
@@ -59,12 +59,12 @@ class BatteryModel():
             parallel_count = sympy.Symbol(self.prefix + "_parallel_count")
         self.parallel_count = parallel_count
 
-        self.max_voltage = single_max_voltage * self.series_count
+        self.voltage = single_voltage * self.series_count
         self.capacity = single_capacity * self.parallel_count
         self.weight = single_weight * self.series_count * self.parallel_count
         self.volume = single_volume * self.series_count * self.parallel_count
-        self.max_current = self.capacity * discharge_rate
-        self.energy = self.max_voltage * self.capacity
+        self.current = self.capacity * discharge_rate
+        self.energy = self.voltage * self.capacity
 
     def bounds(self) -> Dict[str, Tuple[float, float]]:
         bounds = dict()
@@ -78,8 +78,8 @@ class BatteryModel():
         report = {
             self.prefix + "_series_count": self.series_count,
             self.prefix + "_parallel_count": self.parallel_count,
-            self.prefix + "_max_voltage": self.max_voltage,
-            self.prefix + "_max_current": self.max_current,
+            self.prefix + "_voltage": self.voltage,
+            self.prefix + "_current": self.current,
             self.prefix + "_capacity": self.capacity,
             self.prefix + "_energy": self.energy,
             self.prefix + "_weight": self.weight,
@@ -89,6 +89,72 @@ class BatteryModel():
             assert var in report
             del report[var]
         return report
+
+    def constraints(self):
+        return {}
+
+
+class ParetoBatteryModel():
+    PARETO_FUNC = None
+
+    @staticmethod
+    def create_pareto_func():
+        cloud = PointCloud.load(
+            os.path.join(DATA_PATH, "battery_analysis_pareto.csv"),
+            silent=True,
+        )
+        cloud = cloud.projection([
+            "total_voltage",
+            "total_capacity",
+            "total_current",
+            "total_weight",
+        ])
+        ParetoBatteryModel.PARETO_FUNC = pareto_func(
+            "battery_analysis_pareto",
+            cloud,
+            directions=[
+                +1.0,
+                +1.0,
+                +1.0,
+                -1.0,
+            ])
+
+    def __init__(self,
+                 max_voltage: float = 100.0,    # V
+                 max_capacity: float = 1000.0,  # Ah
+                 max_current: float = 1000.0,   # A
+                 max_weight: float = 5.0,       # kg
+                 prefix: str = "battery"):
+        if ParetoBatteryModel.PARETO_FUNC is None:
+            ParetoBatteryModel.create_pareto_func()
+
+        self.max_voltage = max_voltage
+        self.max_capacity = max_capacity
+        self.max_current = max_current
+        self.max_weight = max_weight
+        self.prefix = prefix
+
+        self.voltage = sympy.Symbol(self.prefix + "_voltage")
+        self.capacity = sympy.Symbol(self.prefix + "_capacity")
+        self.current = sympy.Symbol(self.prefix + "_current")
+        self.weight = sympy.Symbol(self.prefix + "_weight")
+
+    def bounds(self) -> Dict[str, Tuple[float, float]]:
+        return {
+            self.prefix + "_voltage": (0.0, self.max_voltage),
+            self.prefix + "_capacity": (0.0, self.max_capacity),
+            self.prefix + "_current": (0.0, self.max_current),
+            self.prefix + "_weight": (0.0, self.max_weight),
+        }
+
+    def report(self) -> Dict[str, Any]:
+        return {}
+
+    def constraints(self):
+        return {
+            self.prefix + "_pareto": ParetoBatteryModel.PARETO_FUNC(
+                self.voltage, self.capacity, self.current, self.weight)
+        }
 
 
 class WingModel():
@@ -224,7 +290,7 @@ class LiftModel():
             del report[var]
         return report
 
-    def equations(self):
+    def constraints(self):
         return {
             "equ_" + self.prefix + "_load": self.lift ** 2 + self.drag ** 2 <= 0.8 * self.max_load ** 2
         }
@@ -356,15 +422,20 @@ class ThrustModel():
 
 
 def napkin2():
-    battery = BatteryModel(
-        series_count=1,
-        # battery_name="TurnigyGraphene6000mAh6S75C",
-        # parallel_count=2,
-        battery_name="Tattu30C12000mAh6S1P",
-        parallel_count=1,
-    )
-    # print(battery.bounds())
-    # print(battery.report())
+    if False:
+        battery = SimpleBatteryModel(
+            series_count=1,
+            # battery_name="TurnigyGraphene6000mAh6S75C",
+            # parallel_count=2,
+            battery_name="Tattu30C12000mAh6S1P",
+            parallel_count=1,
+        )
+        # print(battery.bounds())
+        # print(battery.report())
+    else:
+        battery = ParetoBatteryModel(
+            prefix="battery",
+        )
 
     motor_prop_count = 4
     motor_prop = MotorPropModel(
@@ -405,10 +476,8 @@ def napkin2():
     thrust_takeoff = ThrustModel(
         motor_prop=motor_prop,
         # voltage=battery.max_voltage,
-        # min_voltage=motor_prop.min_voltage,
-        max_voltage=min(motor_prop.max_voltage, battery.max_voltage),
         at20=False,
-        prefix="thrust_takeoff"
+        prefix="thrust_takeoff",
     )
     # print(takeoff.bounds())
     # print(takeoff.report())
@@ -416,10 +485,8 @@ def napkin2():
     thrust_flight = ThrustModel(
         motor_prop=motor_prop,
         # voltage=battery.max_voltage,
-        # min_voltage=motor_prop.min_voltage,
-        max_voltage=min(motor_prop.max_voltage, battery.max_voltage),
         at20=True,
-        prefix="thrust_flight"
+        prefix="thrust_flight",
     )
     # print(flight.bounds())
     # print(flight.report())
@@ -435,10 +502,12 @@ def napkin2():
     # print(wing.bounds())
     # print(wing.report())
 
-    wing_flight = LiftModel(wing=wing,
-                            # speed=25.26121,
-                            # angle=10.0,
-                            prefix="wing_flight")
+    wing_flight = LiftModel(
+        wing=wing,
+        # speed=25.26121,
+        # angle=10.0,
+        prefix="wing_flight",
+    )
     # print(liftdrag.bounds())
     # print(liftdrag.report())
 
@@ -453,12 +522,12 @@ def napkin2():
 
     takeoff_duration = 2 * 100.0                           # s
     takeoff_capacity = thrust_takeoff.current * \
-        motor_prop_count * takeoff_duration                # As
+        motor_prop_count * takeoff_duration / 3600.0       # Ah
 
     flight_distance = 5100.0                               # m
     flight_duration = flight_distance / wing_flight.speed  # s
     flight_capacity = thrust_flight.current * \
-        motor_prop_count * flight_duration                 # As
+        motor_prop_count * flight_duration / 3600.0        # Ah
 
     capacity_frac = (takeoff_capacity + flight_capacity) / battery.capacity
 
@@ -471,12 +540,13 @@ def napkin2():
     }
 
     constraints = {
-        **wing_flight.equations(),
-        "equ_takeoff_current": battery.max_current >= thrust_takeoff.current * motor_prop_count,
-        "equ_takeoff_voltage": battery.max_voltage >= thrust_takeoff.voltage,
+        **battery.constraints(),
+        **wing_flight.constraints(),
+        "equ_takeoff_current": battery.current >= thrust_takeoff.current * motor_prop_count,
+        "equ_takeoff_voltage": battery.voltage >= thrust_takeoff.voltage,
         "equ_takeoff_thrust": thrust_takeoff.thrust * motor_prop_count >= aircraft_weight * GRAVITATION,
-        "equ_flight_current": battery.max_current >= thrust_flight.current * motor_prop_count,
-        "equ_flight_voltage": battery.max_voltage >= thrust_flight.voltage,
+        "equ_flight_current": battery.current >= thrust_flight.current * motor_prop_count,
+        "equ_flight_voltage": battery.voltage >= thrust_flight.voltage,
         "equ_flight_lift": wing_flight.lift * wing_count >= aircraft_weight * GRAVITATION,
         "equ_flight_drag": wing_flight.drag * wing_count + aircraft_frontal_drag <= thrust_flight.thrust * motor_prop_count,
         "equ_total_capacity": capacity_frac < 0.5,
@@ -508,8 +578,8 @@ def napkin2():
     constraints_func = PointFunc(constraints)
     reports_func = PointFunc(reports)
 
-    for step in range(10):
-        tol = [10.0, 1.0, 0.1, 0.01]
+    for step in range(20):
+        tol = [10.0, 5.0, 2.0, 1.0, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01]
         tol = tol[min(step, len(tol) - 1)]
         points.add_mutations(tol, num)
 
@@ -517,6 +587,14 @@ def napkin2():
         points = points.prune_by_tolerances(
             constraints_func(points), tolerances=tol)
         points = points.prune_bounding_box(bounds)
+        if True:
+            points = points.prune_close_points2({
+                "wing_flight_speed": 0.1,
+                "aircraft_weight": 0.01,
+                "wing_chord": 0.01,
+                "wing_span": 0.01,
+                "wing_max_load": 1,
+            })
 
         points = points.extend(reports_func(points, equs_as_float=False))
         points = points.extend(constraints_func(points, equs_as_float=True))
@@ -621,13 +699,13 @@ def napkin1():
 
     battery_count = 2
     if True:
-        battery = BatteryModel(
+        battery = SimpleBatteryModel(
             battery_name="Tattu 25Ah Li",
             series_count=11,
             # parallel_count=5,
         )
     else:
-        battery = BatteryModel(
+        battery = SimpleBatteryModel(
             battery_name="Eagle 11 Ah Li",
             series_count=51,
             # parallel_count=4,
@@ -656,7 +734,7 @@ def napkin1():
         voltage=None,
         min_voltage=motor_prop.min_voltage,
         #        max_voltage=battery.max_voltage,
-        max_voltage=min(motor_prop.max_voltage, battery.max_voltage),
+        max_voltage=min(motor_prop.max_voltage, battery.voltage),
         prefix="flying_motor"
     )
 
@@ -679,7 +757,7 @@ def napkin1():
         voltage=None,
         min_voltage=motor_prop.min_voltage,
         #        max_voltage=battery.max_voltage,
-        max_voltage=min(motor_prop.max_voltage, battery.max_voltage),
+        max_voltage=min(motor_prop.max_voltage, battery.voltage),
         prefix="hover_motor"
     )
 
@@ -687,14 +765,14 @@ def napkin1():
     hover_total_thrust = hover_motor.thrust * motor_prop_count
 
     constraints = {
-        **flying_wing.equations(),
+        **flying_wing.constraints(),
         "equ_battery_volume": battery.volume * battery_count <= wing.available_volume * wing_count,
-        "equ_hover_current": battery.max_current * battery_count >= hover_motor.current * motor_prop_count,
-        "equ_hover_voltage": battery.max_voltage >= hover_motor.voltage,
+        "equ_hover_current": battery.current * battery_count >= hover_motor.current * motor_prop_count,
+        "equ_hover_voltage": battery.voltage >= hover_motor.voltage,
         "equ_hover_capacity": aircraft_capacity * 3600.0 >= hover_motor.current * motor_prop_count * hover_time,
         "equ_hover_thrust": hover_total_thrust >= aircraft_weight,
-        "equ_flying_current": battery.max_current * battery_count >= flying_motor.current * motor_prop_count,
-        "equ_flying_voltage": battery.max_voltage >= flying_motor.voltage,
+        "equ_flying_current": battery.current * battery_count >= flying_motor.current * motor_prop_count,
+        "equ_flying_voltage": battery.voltage >= flying_motor.voltage,
         "equ_flying_capacity": aircraft_capacity * 3600.0 >= flying_motor.current * motor_prop_count * flying_time,
         "equ_flying_lift": flying_total_lift >= aircraft_weight,
         "equ_flying_drag": flying_total_thrust >= flying_total_drag,
@@ -797,7 +875,7 @@ def plot_pareto_steps():
 
 
 def test():
-    battery = BatteryModel(
+    battery = SimpleBatteryModel(
         battery_name="TurnigyGraphene6000mAh6S75C",
         series_count=1,
         parallel_count=2,

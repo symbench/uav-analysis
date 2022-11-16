@@ -21,17 +21,17 @@ import json
 import math
 import os
 
-DATAPATH = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                        'data_hackathon2')
+DATA_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                         'data_hackathon2')
 
 FDM_PATH = default = os.path.relpath(os.path.join(
-    DATAPATH, '..', '..', 'flight-dynamics-model', 'bin'))
+    DATA_PATH, '..', '..', 'flight-dynamics-model', 'bin'))
 
-PROP_PATH = os.path.abspath(os.path.join(DATAPATH, "..", "PropData"))
+PROP_PATH = os.path.abspath(os.path.join(DATA_PATH, "..", "PropData"))
 
 
 def load_static_data(filename: str, modelkey: str = 'MODEL_NAME') -> Dict[str, Dict[str, Any]]:
-    filename = os.path.join(DATAPATH, filename)
+    filename = os.path.join(DATA_PATH, filename)
 
     result = dict()
     with open(filename) as file:
@@ -72,7 +72,7 @@ def find_rpm_j_minmax(perf_file: str) -> Tuple[float, float, float, float]:
 
 
 def create_extended_propeller_table():
-    filename = os.path.join(DATAPATH, "PropellerExt.csv")
+    filename = os.path.join(DATA_PATH, "PropellerExt.csv")
     with open(filename, "w") as file:
         writer = None
 
