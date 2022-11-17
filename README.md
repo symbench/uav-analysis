@@ -28,3 +28,12 @@
   all combination of batteries, then pruned it using
   `constraint-prog pareto-front --neg total_weight --pos total_voltage total_capacity total_current --save battery_analysis_pareto.csv battery_analysis.csv`, and saved it the
   `data_hackathon2` folder.
+
+### High power design:
+
+Used `constraint-prog pareto-front --max weight 0.4 --neg weight power --pos thrust_at20 --save motor_propeller_analysis_pareto.csv motor_propeller_analysis.csv` to find high thrust motor
+propeller combination, then used `uav-analysis motor-propeller-approximate t_motor_AntigravityMN5008KV340 apc_propellers_13x14` to get the tables, then used `uav-analysis napkin-calculator napkin2`, identified the battery by its weight (which is minimized). 
+
+* 4 motors/propellers: t_motor_AntigravityMN5008KV340, apc_propellers_13x14
+* 1 battery: Tattu25C23000mAh6S1PHV
+* 2 wings: NACA 0012, chord 55 mm, span 390 mm, load 492 N

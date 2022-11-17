@@ -154,7 +154,7 @@ class ParetoBatteryModel():
 
     def constraints(self):
         return {
-            self.prefix + "_pareto": ParetoBatteryModel.PARETO_FUNC(
+            "equ_" + self.prefix + "_pareto": ParetoBatteryModel.PARETO_FUNC(
                 self.voltage, self.capacity, self.current, self.weight)
         }
 
@@ -438,40 +438,111 @@ def napkin2():
         )
 
     motor_prop_count = 4
-    motor_prop = MotorPropModel(
-        {
-            "motor_name": "t_motor_MN3510KV700",
-            "propeller_name": "apc_propellers_9_625x3_75N",
-            "weight": 0.148889479,
-            "min_voltage": 0.035,
-            "min_omega_rpm": 7.0,
-            "min_thrust": 0.0,
-            "min_power": 0.02,
-            "min_current": 0.53,
-            "min_omega_rpm_at20": 7.39,
-            "min_thrust_at20": -0.01,
-            "min_power_at20": 0.02,
-            "min_current_at20": 0.51,
-            "med_voltage": 12.747499999999999,
-            "med_omega_rpm": 8701.88,
-            "med_thrust": 5.13,
-            "med_power": 84.87,
-            "med_current": 6.66,
-            "med_omega_rpm_at20": 8801.86,
-            "med_thrust_at20": 1.01,
-            "med_power_at20": 46.54,
-            "med_current_at20": 3.65,
-            "max_voltage": 25.459999999999997,
-            "max_omega_rpm": 17061.14,
-            "max_thrust": 20.07,
-            "max_power": 582.6,
-            "max_current": 22.88,
-            "max_omega_rpm_at20": 16932.88,
-            "max_thrust_at20": 16.05,
-            "max_power_at20": 680.82,
-            "max_current_at20": 26.74
-        }
-    )
+    if False:
+        motor_prop = MotorPropModel(
+            {
+                "motor_name": "t_motor_MN3510KV700",
+                "propeller_name": "apc_propellers_9_625x3_75N",
+                "weight": 0.148889479,
+                "min_voltage": 0.035,
+                "min_omega_rpm": 7.0,
+                "min_thrust": 0.0,
+                "min_power": 0.02,
+                "min_current": 0.53,
+                "min_omega_rpm_at20": 7.39,
+                "min_thrust_at20": -0.01,
+                "min_power_at20": 0.02,
+                "min_current_at20": 0.51,
+                "med_voltage": 12.747499999999999,
+                "med_omega_rpm": 8701.88,
+                "med_thrust": 5.13,
+                "med_power": 84.87,
+                "med_current": 6.66,
+                "med_omega_rpm_at20": 8801.86,
+                "med_thrust_at20": 1.01,
+                "med_power_at20": 46.54,
+                "med_current_at20": 3.65,
+                "max_voltage": 25.459999999999997,
+                "max_omega_rpm": 17061.14,
+                "max_thrust": 20.07,
+                "max_power": 582.6,
+                "max_current": 22.88,
+                "max_omega_rpm_at20": 16932.88,
+                "max_thrust_at20": 16.05,
+                "max_power_at20": 680.82,
+                "max_current_at20": 26.74
+            }
+        )
+    elif False:
+        motor_prop = MotorPropModel(
+            {
+                "motor_name": "t_motor_AntigravityMN6007IIKV160",
+                "propeller_name": "apc_propellers_13x14",
+                "weight": 0.22499734500000002,
+                "min_voltage": 0.09899999999999999,
+                "min_omega_rpm": 1.6,
+                "min_thrust": 0.0,
+                "min_power": 0.05,
+                "min_current": 0.53,
+                "min_omega_rpm_at20": 1.76,
+                "min_thrust_at20": -0.0,
+                "min_power_at20": 0.05,
+                "min_current_at20": 0.52,
+                "med_voltage": 27.8395,
+                "med_omega_rpm": 4286.43,
+                "med_thrust": 8.71,
+                "med_power": 172.75,
+                "med_current": 6.21,
+                "med_omega_rpm_at20": 4243.22,
+                "med_thrust_at20": 6.02,
+                "med_power_at20": 217.22,
+                "med_current_at20": 7.8,
+                "max_voltage": 55.580000000000005,
+                "max_omega_rpm": 8319.2,
+                "max_thrust": 33.6,
+                "max_power": 1178.31,
+                "max_current": 21.2,
+                "max_omega_rpm_at20": 8124.71,
+                "max_thrust_at20": 32.58,
+                "max_power_at20": 1577.85,
+                "max_current_at20": 28.39
+            }
+        )
+    else:
+        motor_prop = MotorPropModel(
+            {
+                "motor_name": "t_motor_AntigravityMN5008KV340",
+                "propeller_name": "apc_propellers_13x14",
+                "weight": 0.200997345,
+                "min_voltage": 0.059500000000000004,
+                "min_omega_rpm": 3.4,
+                "min_thrust": 0.0,
+                "min_power": 0.06,
+                "min_current": 0.95,
+                "min_omega_rpm_at20": 3.89,
+                "min_thrust_at20": -0.01,
+                "min_power_at20": 0.05,
+                "min_current_at20": 0.92,
+                "med_voltage": 11.62975,
+                "med_omega_rpm": 3769.35,
+                "med_thrust": 6.7,
+                "med_power": 120.96,
+                "med_current": 10.4,
+                "med_omega_rpm_at20": 3751.78,
+                "med_thrust_at20": 3.65,
+                "med_power_at20": 132.46,
+                "med_current_at20": 11.39,
+                "max_voltage": 23.2,
+                "max_omega_rpm": 7275.85,
+                "max_thrust": 25.6,
+                "max_power": 799.43,
+                "max_current": 34.46,
+                "max_omega_rpm_at20": 7044.73,
+                "max_thrust_at20": 24.08,
+                "max_power_at20": 1101.25,
+                "max_current_at20": 47.47
+            }
+        )
 
     thrust_takeoff = ThrustModel(
         motor_prop=motor_prop,
@@ -541,7 +612,7 @@ def napkin2():
         "equ_flight_voltage": battery.voltage >= thrust_flight.voltage,
         "equ_flight_lift": wing_flight.lift * wing_count >= aircraft_weight * GRAVITATION,
         "equ_flight_drag": wing_flight.drag * wing_count + aircraft_frontal_drag <= thrust_flight.thrust * motor_prop_count,
-        "equ_total_capacity": capacity_frac < 0.5,
+        "equ_total_capacity": capacity_frac < 0.4,
     }
 
     reports = {
