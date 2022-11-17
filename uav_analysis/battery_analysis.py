@@ -18,7 +18,6 @@ from typing import Any, Dict, Iterable, Generator, Optional
 
 import csv
 import json
-import math
 import sys
 
 from .components import BATTERIES

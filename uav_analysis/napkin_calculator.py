@@ -96,6 +96,7 @@ class SimpleBatteryModel():
 
 class ParetoBatteryModel():
     PARETO_FUNC = None
+    BOUNDS = None
 
     @staticmethod
     def create_pareto_func():
@@ -109,6 +110,7 @@ class ParetoBatteryModel():
             "total_current",
             "total_weight",
         ])
+        ParetoBatteryModel.BOUNDS = cloud.get_bounds()
         ParetoBatteryModel.PARETO_FUNC = pareto_func(
             "battery_analysis_pareto",
             cloud,
@@ -120,31 +122,31 @@ class ParetoBatteryModel():
             ])
 
     def __init__(self,
-                 max_voltage: float = 100.0,    # V
-                 max_capacity: float = 1000.0,  # Ah
-                 max_current: float = 1000.0,   # A
-                 max_weight: float = 5.0,       # kg
                  prefix: str = "battery"):
         if ParetoBatteryModel.PARETO_FUNC is None:
             ParetoBatteryModel.create_pareto_func()
 
-        self.max_voltage = max_voltage
-        self.max_capacity = max_capacity
-        self.max_current = max_current
-        self.max_weight = max_weight
         self.prefix = prefix
 
-        self.voltage = sympy.Symbol(self.prefix + "_voltage")
-        self.capacity = sympy.Symbol(self.prefix + "_capacity")
-        self.current = sympy.Symbol(self.prefix + "_current")
-        self.weight = sympy.Symbol(self.prefix + "_weight")
+        self.voltage = sympy.Symbol(self.prefix + "_voltage")    # V
+        self.capacity = sympy.Symbol(self.prefix + "_capacity")  # Ah
+        self.current = sympy.Symbol(self.prefix + "_current")    # A
+        self.weight = sympy.Symbol(self.prefix + "_weight")      # kg
 
     def bounds(self) -> Dict[str, Tuple[float, float]]:
         return {
-            self.prefix + "_voltage": (0.0, self.max_voltage),
-            self.prefix + "_capacity": (0.0, self.max_capacity),
-            self.prefix + "_current": (0.0, self.max_current),
-            self.prefix + "_weight": (0.0, self.max_weight),
+            self.prefix + "_voltage": (
+                0.0,
+                ParetoBatteryModel.BOUNDS["total_voltage"][1]),
+            self.prefix + "_capacity": (
+                0.0,
+                ParetoBatteryModel.BOUNDS["total_capacity"][1]),
+            self.prefix + "_current": (
+                0.0,
+                ParetoBatteryModel.BOUNDS["total_current"][1]),
+            self.prefix + "_weight": (
+                ParetoBatteryModel.BOUNDS["total_weight"][0],
+                2.0 * ParetoBatteryModel.BOUNDS["total_weight"][1]),
         }
 
     def report(self) -> Dict[str, Any]:
@@ -430,8 +432,6 @@ def napkin2():
             battery_name="Tattu30C12000mAh6S1P",
             parallel_count=1,
         )
-        # print(battery.bounds())
-        # print(battery.report())
     else:
         battery = ParetoBatteryModel(
             prefix="battery",
@@ -479,8 +479,6 @@ def napkin2():
         at20=False,
         prefix="thrust_takeoff",
     )
-    # print(takeoff.bounds())
-    # print(takeoff.report())
 
     thrust_flight = ThrustModel(
         motor_prop=motor_prop,
@@ -488,8 +486,6 @@ def napkin2():
         at20=True,
         prefix="thrust_flight",
     )
-    # print(flight.bounds())
-    # print(flight.report())
 
     wing_count = 2
     wing = WingModel(
@@ -499,8 +495,6 @@ def napkin2():
         # span=0.6,     # m
         prefix="wing",
     )
-    # print(wing.bounds())
-    # print(wing.report())
 
     wing_flight = LiftModel(
         wing=wing,
@@ -508,8 +502,6 @@ def napkin2():
         # angle=10.0,
         prefix="wing_flight",
     )
-    # print(liftdrag.bounds())
-    # print(liftdrag.report())
 
     cargo_weight = 0.5
     aircraft_weight = 1.47 + cargo_weight + battery.weight \
