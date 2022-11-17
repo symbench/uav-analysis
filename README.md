@@ -29,11 +29,19 @@
   `constraint-prog pareto-front --neg total_weight --pos total_voltage total_capacity total_current --save battery_analysis_pareto.csv battery_analysis.csv`, and saved it the
   `data_hackathon2` folder.
 
-### High power design:
+### High power design 1:
 
-Used `constraint-prog pareto-front --max weight 0.4 --neg weight power --pos thrust_at20 --save motor_propeller_analysis_pareto.csv motor_propeller_analysis.csv` to find high thrust motor
-propeller combination, then used `uav-analysis motor-propeller-approximate t_motor_AntigravityMN5008KV340 apc_propellers_13x14` to get the tables, then used `uav-analysis napkin-calculator napkin2`, identified the battery by its weight (which is minimized). 
+Used `constraint-prog pareto-front --max weight 0.4 --neg weight power --pos thrust_at20 --save motor_propeller_analysis_pareto.csv motor_propeller_analysis.csv` to find high thrust motor propeller combination, then used `uav-analysis motor-propeller-approximate t_motor_AntigravityMN5008KV340 apc_propellers_13x14` to get the tables, then used `uav-analysis napkin-calculator napkin2`, identified the battery by its weight (which is minimized). 
 
 * 4 motors/propellers: t_motor_AntigravityMN5008KV340, apc_propellers_13x14
 * 1 battery: Tattu25C23000mAh6S1PHV
 * 2 wings: NACA 0012, chord 55 mm, span 390 mm, load 492 N
+
+### High power design 2:
+
+Used `uav-analysis motor-propeller-analysis --speed 40` to generate a dataset, and `constraint-prog pareto-front --min flying_thrust 20 --neg weight flying_power --pos flying_thrust --save motor_propeller_analysis_40_pareto.csv motor_propeller_analysis_40.csv` to prune it down. Sorting by `flying_thrust` and selecting
+a relative low weight, high flying thrust and 22.8 volt combination we got the motor propeller combination. The same battery is used as before to avoid a
+fuselage redesign, but a potential alternative is Tattu15C17000mAh6S1PHV.
+
+* 4 motors/propellers: kde_direct_KDE700XF_535_G3, apc_propellers_12x8SF
+* 1 battery: Tattu25C23000mAh6S1PHV or Tattu15C17000mAh6S1PHV
