@@ -25,6 +25,7 @@ from . import aggregate_analysis
 from . import napkin_calculator
 from . import symbolic_propeller
 from . import tweak_fdm_input
+from . import study_fdm_parser
 
 
 def run():
@@ -41,6 +42,7 @@ def run():
         "napkin-calculator",
         "symbolic-propeller",
         'tweak-fdm-input',
+        'study-fdm-parser',
     ])))
     args = parser.parse_args(sys.argv[1:2])
 
@@ -68,6 +70,8 @@ def run():
         symbolic_propeller.run(args=sys.argv[2:])
     elif args.command == 'tweak-fdm-input':
         tweak_fdm_input.run(args=sys.argv[2:])
+    elif args.command == 'study-fdm-parser':
+        study_fdm_parser.run(args=sys.argv[2:])
     else:
         parser.print_help()
 
