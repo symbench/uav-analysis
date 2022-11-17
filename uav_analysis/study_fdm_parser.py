@@ -29,6 +29,8 @@ def process_study(folder_iterator):
         if not folder.is_dir():
             continue
         out_filename = folder / "flightDynFastOut.out"
+        if not out_filename.is_file():
+            continue
         with out_filename.open() as out_file:
             fdm_result = parse_fdm_output(out_file.read())
 
@@ -61,18 +63,20 @@ def run(args=None):
     else:
         print(f"cannot find {args.data}")
 
-
     results = process_study(study_iterator)
 
     if results:
-        writer = csv.DictWriter(sys.stdout, fieldnames=sorted(results[0].keys()))
+        writer = csv.DictWriter(
+            sys.stdout,
+            fieldnames=sorted(results[0].keys()),
+            lineterminator="\n",
+        )
         writer.writeheader()
         for result in results:
             writer.writerow(result)
 
     if zip_file is not None:
         zip_file.close()
-
 
 
 if __name__ == "__main__":
