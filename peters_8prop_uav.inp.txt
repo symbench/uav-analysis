@@ -1,0 +1,273 @@
+&aircraft_data
+   aircraft%cname='UAV'
+   aircraft%ctype='SymCPSDesign'
+   aircraft%i_analysis_type =3
+   aircraft%num_wings		= 2
+   aircraft%num_propellers      = 8
+   aircraft%mass          = 6.04371160303512
+   aircraft%x_cm          =  43.88903294742921
+   aircraft%y_cm          =  -0.03214703856613242
+   aircraft%z_cm          =  -19.480335003214517
+   aircraft%x_fuse        =  91.44746000412552
+   aircraft%y_fuse        =  -3.1423400402581954e-14
+   aircraft%z_fuse        =  6.524354785173328
+   aircraft%X_fuseuu      =  48850.17953413837
+   aircraft%Y_fusevv      =  294377.3159806777
+   aircraft%Z_fuseww      =  294288.07920912234
+   aircraft%Ixx           =  528680.6672741538
+   aircraft%Ixy           =  -43.50286362131145
+   aircraft%Ixz           =  -7151.209474144338
+   aircraft%Iyy           =  155133.52552488074
+   aircraft%Iyz           =  0.0
+   aircraft%Izz           =  493595.17978522094
+   aircraft%time           = 0.d0        ! initial time (default = 0.)
+   aircraft%dt             = 1.d-03      ! s  fixed time step
+   aircraft%dt_output      = 1.0d0       ! s  time between output lines
+   aircraft%time_end       = 1000.d0        ! s  end time 
+   aircraft%Unwind         = 0.d0        ! North wind speed in world frame
+   aircraft%Vewind         = 0.d0        ! East wind speed in  world frame
+   aircraft%Wdwind         = 0.d0        ! Down wind speed in world frame
+   aircraft%debug          = 0           ! verbose printouts from fderiv
+   aircraft%num_batteries      = 1
+
+! Propeller front_lower_l1_prop  Motor:front_lower_l1_motor comps: {'PROP': 'front_lower_l1_prop', 'ESC': 'BatteryController', 'BATT': ['Battery_1', 'Battery_1']}
+   propeller(1)%cname        = 'front_lower_l1_prop'
+   propeller(1)%prop_fname   = '..//..//..//Tables/PropData/PER3_13x14.dat'
+   propeller(1)%x = 155.655
+   propeller(1)%y = -220.32
+   propeller(1)%z = 209.7861
+   propeller(1)%nx = 1.0000
+   propeller(1)%ny = -0.0000
+   propeller(1)%nz = -0.0000
+   propeller(1)%radius =   165.1000
+   propeller(1)%spin =   -1
+   propeller(1)%Ir =   599.6520966611499
+   propeller(1)%motor_fname  =   '../../Motors/t_motor_AntigravityMN5008KV340'
+   propeller(1)%Rw  =   0.055
+   propeller(1)%KV  =   340.0
+   propeller(1)%KT  =   0.02808616642798153
+   propeller(1)%I_max  =   35.0
+   propeller(1)%I_idle  =   0.9
+   propeller(1)%maxpower  =   760.0
+   propeller(1)%icontrol  =   4
+   propeller(1)%ibattery  =   1
+
+! Propeller front_lower_l2_prop  Motor:front_lower_l2_motor comps: {'PROP': 'front_lower_l2_prop', 'ESC': 'BatteryController', 'BATT': ['Battery_1', 'Battery_1']}
+   propeller(2)%cname        = 'front_lower_l2_prop'
+   propeller(2)%prop_fname   = '..//..//..//Tables/PropData/PER3_13x14.dat'
+   propeller(2)%x = 155.655
+   propeller(2)%y = -640.64
+   propeller(2)%z = 209.7861
+   propeller(2)%nx = 1.0000
+   propeller(2)%ny = -0.0000
+   propeller(2)%nz = -0.0000
+   propeller(2)%radius =   165.1000
+   propeller(2)%spin =   -1
+   propeller(2)%Ir =   599.6520966611499
+   propeller(2)%motor_fname  =   '../../Motors/t_motor_AntigravityMN5008KV340'
+   propeller(2)%Rw  =   0.055
+   propeller(2)%KV  =   340.0
+   propeller(2)%KT  =   0.02808616642798153
+   propeller(2)%I_max  =   35.0
+   propeller(2)%I_idle  =   0.9
+   propeller(2)%maxpower  =   760.0
+   propeller(2)%icontrol  =   4
+   propeller(2)%ibattery  =   1
+
+! Propeller front_lower_r1_prop  Motor:front_lower_r1_motor comps: {'ESC': 'BatteryController', 'PROP': 'front_lower_r1_prop', 'BATT': ['Battery_1', 'Battery_1']}
+   propeller(3)%cname        = 'front_lower_r1_prop'
+   propeller(3)%prop_fname   = '..//..//..//Tables/PropData/PER3_13x14.dat'
+   propeller(3)%x = 155.655
+   propeller(3)%y = 220.32
+   propeller(3)%z = 209.7861
+   propeller(3)%nx = 1.0000
+   propeller(3)%ny = -0.0000
+   propeller(3)%nz = -0.0000
+   propeller(3)%radius =   165.1000
+   propeller(3)%spin =   1
+   propeller(3)%Ir =   599.6520966611499
+   propeller(3)%motor_fname  =   '../../Motors/t_motor_AntigravityMN5008KV340'
+   propeller(3)%Rw  =   0.055
+   propeller(3)%KV  =   340.0
+   propeller(3)%KT  =   0.02808616642798153
+   propeller(3)%I_max  =   35.0
+   propeller(3)%I_idle  =   0.9
+   propeller(3)%maxpower  =   760.0
+   propeller(3)%icontrol  =   2
+   propeller(3)%ibattery  =   1
+
+! Propeller front_lower_r2_prop  Motor:front_lower_r2_motor comps: {'ESC': 'BatteryController', 'PROP': 'front_lower_r2_prop', 'BATT': ['Battery_1', 'Battery_1']}
+   propeller(4)%cname        = 'front_lower_r2_prop'
+   propeller(4)%prop_fname   = '..//..//..//Tables/PropData/PER3_13x14.dat'
+   propeller(4)%x = 155.655
+   propeller(4)%y = 640.64
+   propeller(4)%z = 209.7861
+   propeller(4)%nx = 1.0000
+   propeller(4)%ny = -0.0000
+   propeller(4)%nz = -0.0000
+   propeller(4)%radius =   165.1000
+   propeller(4)%spin =   1
+   propeller(4)%Ir =   599.6520966611499
+   propeller(4)%motor_fname  =   '../../Motors/t_motor_AntigravityMN5008KV340'
+   propeller(4)%Rw  =   0.055
+   propeller(4)%KV  =   340.0
+   propeller(4)%KT  =   0.02808616642798153
+   propeller(4)%I_max  =   35.0
+   propeller(4)%I_idle  =   0.9
+   propeller(4)%maxpower  =   760.0
+   propeller(4)%icontrol  =   2
+   propeller(4)%ibattery  =   1
+
+! Propeller front_upper_l1_prop  Motor:front_upper_l1_motor comps: {'PROP': 'front_upper_l1_prop', 'ESC': 'BatteryController', 'BATT': ['Battery_1', 'Battery_1']}
+   propeller(5)%cname        = 'front_upper_l1_prop'
+   propeller(5)%prop_fname   = '..//..//..//Tables/PropData/PER3_13x14.dat'
+   propeller(5)%x = 155.655
+   propeller(5)%y = -220.32
+   propeller(5)%z = -195.2939
+   propeller(5)%nx = 1.0000
+   propeller(5)%ny = -0.0000
+   propeller(5)%nz = -0.0000
+   propeller(5)%radius =   165.1000
+   propeller(5)%spin =   1
+   propeller(5)%Ir =   599.6520966611499
+   propeller(5)%motor_fname  =   '../../Motors/t_motor_AntigravityMN5008KV340'
+   propeller(5)%Rw  =   0.055
+   propeller(5)%KV  =   340.0
+   propeller(5)%KT  =   0.02808616642798153
+   propeller(5)%I_max  =   35.0
+   propeller(5)%I_idle  =   0.9
+   propeller(5)%maxpower  =   760.0
+   propeller(5)%icontrol  =   3
+   propeller(5)%ibattery  =   1
+
+! Propeller front_upper_l2_prop  Motor:front_upper_l2_motor comps: {'PROP': 'front_upper_l2_prop', 'ESC': 'BatteryController', 'BATT': ['Battery_1', 'Battery_1']}
+   propeller(6)%cname        = 'front_upper_l2_prop'
+   propeller(6)%prop_fname   = '..//..//..//Tables/PropData/PER3_13x14.dat'
+   propeller(6)%x = 155.655
+   propeller(6)%y = -640.64
+   propeller(6)%z = -195.2939
+   propeller(6)%nx = 1.0000
+   propeller(6)%ny = -0.0000
+   propeller(6)%nz = -0.0000
+   propeller(6)%radius =   165.1000
+   propeller(6)%spin =   1
+   propeller(6)%Ir =   599.6520966611499
+   propeller(6)%motor_fname  =   '../../Motors/t_motor_AntigravityMN5008KV340'
+   propeller(6)%Rw  =   0.055
+   propeller(6)%KV  =   340.0
+   propeller(6)%KT  =   0.02808616642798153
+   propeller(6)%I_max  =   35.0
+   propeller(6)%I_idle  =   0.9
+   propeller(6)%maxpower  =   760.0
+   propeller(6)%icontrol  =   3
+   propeller(6)%ibattery  =   1
+
+! Propeller front_upper_r1_prop  Motor:front_upper_r1_motor comps: {'ESC': 'BatteryController', 'PROP': 'front_upper_r1_prop', 'BATT': ['Battery_1', 'Battery_1']}
+   propeller(7)%cname        = 'front_upper_r1_prop'
+   propeller(7)%prop_fname   = '..//..//..//Tables/PropData/PER3_13x14.dat'
+   propeller(7)%x = 155.655
+   propeller(7)%y = 220.32
+   propeller(7)%z = -195.2939
+   propeller(7)%nx = 1.0000
+   propeller(7)%ny = -0.0000
+   propeller(7)%nz = -0.0000
+   propeller(7)%radius =   165.1000
+   propeller(7)%spin =   -1
+   propeller(7)%Ir =   599.6520966611499
+   propeller(7)%motor_fname  =   '../../Motors/t_motor_AntigravityMN5008KV340'
+   propeller(7)%Rw  =   0.055
+   propeller(7)%KV  =   340.0
+   propeller(7)%KT  =   0.02808616642798153
+   propeller(7)%I_max  =   35.0
+   propeller(7)%I_idle  =   0.9
+   propeller(7)%maxpower  =   760.0
+   propeller(7)%icontrol  =   1
+   propeller(7)%ibattery  =   1
+
+! Propeller front_upper_r2_prop  Motor:front_upper_r2_motor comps: {'ESC': 'BatteryController', 'PROP': 'front_upper_r2_prop', 'BATT': ['Battery_1', 'Battery_1']}
+   propeller(8)%cname        = 'front_upper_r2_prop'
+   propeller(8)%prop_fname   = '..//..//..//Tables/PropData/PER3_13x14.dat'
+   propeller(8)%x = 155.655
+   propeller(8)%y = 640.64
+   propeller(8)%z = -195.2939
+   propeller(8)%nx = 1.0000
+   propeller(8)%ny = -0.0000
+   propeller(8)%nz = -0.0000
+   propeller(8)%radius =   165.1000
+   propeller(8)%spin =   -1
+   propeller(8)%Ir =   599.6520966611499
+   propeller(8)%motor_fname  =   '../../Motors/t_motor_AntigravityMN5008KV340'
+   propeller(8)%Rw  =   0.055
+   propeller(8)%KV  =   340.0
+   propeller(8)%KT  =   0.02808616642798153
+   propeller(8)%I_max  =   35.0
+   propeller(8)%I_idle  =   0.9
+   propeller(8)%maxpower  =   760.0
+   propeller(8)%icontrol  =   1
+   propeller(8)%ibattery  =   1
+
+!   Wing (1) is component named: wing_l
+   wing(1)%surface_area   = 23400.0 
+   wing(1)%a   = 0.101 
+   wing(1)%C_L0   = -0.0 
+   wing(1)%C_Lmax   = 1.53 
+   wing(1)%C_Lmin   = -1.53 
+   wing(1)%C_D0   = 0.0083 
+   wing(1)%k   = 0.06052839324610438 
+   wing(1)%C_Dfp   = 1 
+   wing(1)%max_load  = 50.0 
+   wing(1)%bias1   =  1.0
+   wing(1)%bias2   =  0.5
+   wing(1)%icontrol1 = 6  
+   wing(1)%icontrol2 = 0 
+   wing(1)%x   = -1.4210854715202004e-14
+   wing(1)%y   = -270.16
+   wing(1)%z   = 7.2460913705581795
+   wing(1)%nx   = -0.0
+   wing(1)%ny   = 0.0
+   wing(1)%nz   = 1.0
+
+!   Wing (2) is component named: wing_r
+   wing(2)%surface_area   = 23400.0 
+   wing(2)%a   = 0.101 
+   wing(2)%C_L0   = -0.0 
+   wing(2)%C_Lmax   = 1.53 
+   wing(2)%C_Lmin   = -1.53 
+   wing(2)%C_D0   = 0.0083 
+   wing(2)%k   = 0.06052839324610438 
+   wing(2)%C_Dfp   = 1 
+   wing(2)%max_load  = 50.0 
+   wing(2)%bias1   =  1.0
+   wing(2)%bias2   =  0.5
+   wing(2)%icontrol1 = 5  
+   wing(2)%icontrol2 = 0 
+   wing(2)%x   = -1.4210854715202004e-14
+   wing(2)%y   = 270.16
+   wing(2)%z   = 7.246091370558588
+   wing(2)%nx   = -0.0
+   wing(2)%ny   = 0.0
+   wing(2)%nz   = -1.0
+!   Batteries: {'BatteryController': ['Battery_1']}
+
+!   Battery(1) is an aggregate of the above 
+   battery(1)%voltage   = 22.8 
+   battery(1)%capacity   = 23000.0 
+   battery(1)%C_Continuous   = 25.0 
+   battery(1)%C_Peak         = 50.0 
+!   Controls
+    control%i_flight_path = 9
+    control%requested_lateral_speed = 44.0
+    control%requested_vertical_speed = -17.0
+   control%requested_vertical_down_speed = 24.0
+   control%requested_lateral_acceleration = 5.5
+   control%requested_lateral_deceleration = -8.5
+   control%requested_vertical_acceleration = -9.5
+   control%requested_vertical_deceleration = 19.5
+   control%landing_approach_height  = 1.5
+   control%vertical_landing_speed_at_ground  = 0.05
+    control%Q_position = 0.19952623149688797
+    control%Q_velocity =  0.01
+    control%Q_angular_velocity =  63.09573444801935
+    control%Q_angles =  0.6309573444801934
+    control%R=  125.89254117941675
+/ 
