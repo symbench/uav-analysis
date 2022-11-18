@@ -39,9 +39,10 @@ Used `constraint-prog pareto-front --max weight 0.4 --neg weight power --pos thr
 
 ### High power design 2:
 
-Used `uav-analysis motor-propeller-analysis --speed 40` to generate a dataset, and `constraint-prog pareto-front --min flying_thrust 20 --neg weight flying_power --pos flying_thrust --save motor_propeller_analysis_40_pareto.csv motor_propeller_analysis_40.csv` to prune it down. Sorting by `flying_thrust` and selecting
-a relative low weight, high flying thrust and 22.8 volt combination we got the motor propeller combination. The same battery is used as before to avoid a
-fuselage redesign, but a potential alternative is Tattu15C17000mAh6S1PHV.
+Used `uav-analysis motor-propeller-analysis --speed 30 --output motor_propeller_analysis_30.csv` to generate a dataset, 
+and `constraint-prog pareto-front --max weight 0.3 --min flying_thrust 15 --neg weight hover_power --pos flying_thrust --save motor_propeller_analysis_30_pareto.csv motor_propeller_analysis_30.csv` to prune it down. 
+Sorting by `flying_thrust` and selecting a low weight, high flying thrust and the only 22.8 volt combination we got the motor propeller combination.
+We kept the same battery to avoid the fuselage redesign.
 
-* 4 motors/propellers: kde_direct_KDE700XF_535_G3, apc_propellers_12x8SF
-* 1 battery: Tattu25C23000mAh6S1PHV or Tattu15C17000mAh6S1PHV
+* 4 motors/propellers: t_motor_AntigravityMN6007IIKV320, apc_propellers_13x14
+* 1 battery: Tattu25C23000mAh6S1PHV
