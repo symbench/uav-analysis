@@ -241,11 +241,18 @@ def run(args=None):
             result["fdm_output"] = fdm_output
             return result
 
-        def print_result(result):
+
+        def print_result(result, best=None):
             result = dict(result)
             del result["fdm_input"]
             del result["fdm_output"]
-            print(result)
+            best_metric = ""
+            if best:
+                if args.optimize == "trims":
+                    best_metric = f"best num_trims: {best['num_trims']}"
+                else:
+                    best_metric = f"best score: {best['path_score']}"
+            print(result, best_metric)
 
         best = None
         with concurrent.futures.ThreadPoolExecutor(max_workers=args.nproc) as executor:
@@ -261,7 +268,7 @@ def run(args=None):
                 else:
                     result["best"] = False
 
-                print_result(result)
+                print_result(result, best)
 
         print("\nBest was:")
         print_result(best)
