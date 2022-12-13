@@ -25,6 +25,7 @@ from . import aggregate_analysis
 from . import napkin_calculator
 from . import symbolic_propeller
 from . import tweak_fdm_input
+from . import pymoo_fdm_tweak
 from . import study_fdm_parser
 
 
@@ -43,6 +44,7 @@ def run():
         "symbolic-propeller",
         'tweak-fdm-input',
         'study-fdm-parser',
+        'pymoo-fdm-tweak',
     ])))
     args = parser.parse_args(sys.argv[1:2])
 
@@ -72,6 +74,8 @@ def run():
         tweak_fdm_input.run(args=sys.argv[2:])
     elif args.command == 'study-fdm-parser':
         study_fdm_parser.run(args=sys.argv[2:])
+    elif args.command == 'pymoo-fdm-tweak':
+        pymoo_fdm_tweak.run(args=sys.argv[2:])
     else:
         parser.print_help()
 

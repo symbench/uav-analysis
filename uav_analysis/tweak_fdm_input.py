@@ -37,7 +37,7 @@ ACCEL = re.compile(
     r"^(\s*control\%requested_(lateral_acceleration|lateral_deceleration|vertical_acceleration|vertical_deceleration)\s*=\s*)([-+0-9.e]*)\s*$")
 
 CONTROL = re.compile(
-    r"^(\s*control\%([QR])[_a-zA-Z]*\s*=\s*)([-+0-9.e]*)\s*$")
+    r"^(\s*control\%(([QR])[_a-zA-Z]*\s*)=\s*)([-+0-9.e]*)\s*$")
 
 
 def rewrite_line(line: str,
@@ -72,8 +72,8 @@ def rewrite_line(line: str,
         return match.group(1) + str(new_value) + "\n"
 
     if match := CONTROL.match(line):
-        old_value = float(match.group(3))
-        new_coef = control_coef["QR".index(match.group(2))]
+        old_value = float(match.group(4))
+        new_coef = control_coef["QR".index(match.group(3))]
         new_value = old_value * new_coef ** (random.randint(-10, 10) * 0.1)
         return match.group(1) + str(new_value) + "\n"
 
